@@ -14,7 +14,7 @@ function rig(answer) {
   const app = { get: (p, fn) => { routes["GET " + p] = fn; }, post: (p, fn) => { routes["POST " + p] = fn; } };
   const noop = { run: async () => ({}) };
   const stage1 = {
-    status: () => ({}), turnOn: () => ({}), turnOff: () => ({}), setProfile: () => ({}), albums: () => null,
+    status: () => ({}), turnOn: () => ({}), turnOff: () => ({}), albums: () => null,
     marks: {}, finder: {}, later: { read: async () => ({}) }, smartProbe: noop, smartUpdater: {}, zoneProbe: noop, peqTry: {},
     zoneSettings: {}, zoneControls: {}, zoneDsp: {}, dspSettings: {}, peq: {},
     editInfoProbe: { run: async (o) => { runs.push(o); return answer; } },

@@ -83,8 +83,8 @@ function build(albums, opts) {
   // extracted functions without the harness needing a setter.
   const ambiguous = new Set();
   const F = loadIndexFunctions(EXTRACT, {
-    labelsDb: db,
-    DEBUG: false,
+    labelsDb: db, DEBUG: false,
+    listening: { keepTrackList() {} },   // the list by position too (lib/listening/, 2.0.6-t20; tested in listening.test.js)
     albumIndex: { albums: list, builtAt: 1 },
     ambiguousAlbumKeys: ambiguous,
     _libLookup: { builtAt: -1, byKey: null, byTitle: null, byAkey: null, canon: null },

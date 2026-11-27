@@ -28,6 +28,7 @@ function openHarness(o) {
   const X = { title: "Blue Lines", subtitle: "Massive Attack" };
   const OTHER = { title: "Bossanova", subtitle: "Pixies" };
   const F = loadIndexFunctions(["loadAlbumSession", "albumIdentityMatches", "normalize"], {
+    enterAlbum: require("../../lib/provider/public/album-search").enterAlbum,   // moved out of loadAlbumSession (2.0.6-t19)
     navigateToAlbumList: async () => ({ hierarchy: "albums", total: o.total !== undefined ? o.total : 100 }),
     publicIndex: { count: 100, declared: 100 },
     // Roon has X at o.roonHas, and something else at every other offset.
@@ -125,7 +126,7 @@ test("only an album the SNAPSHOT cannot place asks for the list to be re-read", 
 // library nobody touched.
 // ---------------------------------------------------------------------------
 function buildHarness(live, current, chainOpts, native) {
-  const calls = { chain: 0, years: 0, ambiguous: 0, firstSeen: 0, credits: 0, roon: 0 };
+  const calls = { chain: 0, years: 0, ambiguous: 0, firstSeen: 0, credits: 0, roon: 0, roonDates: 0 };
   const reads = [];
   const publicIndex = Object.assign({ albums: [], count: 0, declared: 0 }, current);
   const albumIndex = { albums: publicIndex.albums, count: publicIndex.count, builtAt: 1000, progress: 0, building: null };
@@ -142,6 +143,8 @@ function buildHarness(live, current, chainOpts, native) {
     rebuildAmbiguousAlbumKeys: () => { calls.ambiguous++; },
     recordFirstSeenAlbums: () => { calls.firstSeen++; },
     rebuildCreditIdentities: () => { calls.credits++; },
+    storeRoonDates: () => { calls.roonDates++; },   // 2.0.6-t15: Roon's release dates, with its library in force
+    listeningLibraryChanged() {},   // 2.0.6-t20: plays' albums named against the library (listening.test.js)
     harvestAlbumYears: () => { calls.years++; }, roonDirect: { indexChanged: () => { calls.roon++; }, albums: () => native || null },   // v1.9.18
     syncChain: async () => { calls.chain++; },
     Date: { now: () => 5000 },
@@ -164,9 +167,11 @@ test("Roon direct's library: the screens get the Core's albums, the walk keeps i
     [["B", 1, "qobuz", "nb"], ["Only Roon", PAST_END, "tidal", "nz"]], "THE one: the screens were given the walk, not the Core's list");
   assert.equal(h.albumIndex.count, 2);
   assert.equal(h.albumIndex.builtAt, 5000);
+  assert.equal(h.calls.roonDates, 1, "Roon's dates were not stored with Roon's library (2.0.6-t15)");
   const off = buildHarness(live, {});
   await off.F.buildAlbumIndex({ chain: false });
   assert.equal(off.albumIndex.albums, off.publicIndex.albums, "off: the walk itself, as before v1.9.21");
+  assert.equal(off.calls.roonDates, 0, "off: no library of Roon's, no dates of Roon's stored");
 });
 
 test("Roon's list read anew dates nothing: only the official list's walk does (the review, v1.9.21)", () => {
@@ -178,6 +183,7 @@ test("Roon's list read anew dates nothing: only the official list's walk does (t
     roonDirect: { albums: () => [{ oid: "1", title: "A (Deluxe)", artist: "x", contentSource: 1, imageKey: null }] },
     indexRecord: (it, off) => ({ offset: off, title: it.title, subtitle: it.subtitle, nTitle: it.title.toLowerCase(), nArtist: it.subtitle }),
     rebuildAmbiguousAlbumKeys() {}, rebuildCreditIdentities() {}, recordFirstSeenAlbums: (list) => seen.push(list),
+    storeRoonDates() {}, listeningLibraryChanged() {},
   });
   F.publishLibrary(false);
   assert.deepEqual(seen, [], "THE one: turning Roon direct on dated the Core's spellings as newly added");
@@ -195,7 +201,7 @@ test("a re-read that finds nothing new publishes nothing", async (t) => {
     await h.F.buildAlbumIndex({ diff: true, chain: false });
     assert.equal(h.albumIndex.builtAt, 1000,
       "an unchanged library was republished — every open screen re-reads itself for nothing");
-    assert.deepEqual(h.calls, { chain: 0, years: 0, ambiguous: 0, firstSeen: 0, credits: 0, roon: 0 });
+    assert.deepEqual(h.calls, { chain: 0, years: 0, ambiguous: 0, firstSeen: 0, credits: 0, roon: 0, roonDates: 0 });
   });
 
   await t.test("a new album, a renamed one, a moved row, a new cover: all published", async () => {

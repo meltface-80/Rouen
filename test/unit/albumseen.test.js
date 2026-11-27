@@ -18,9 +18,9 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { loadIndexFunctions } = require("../lib/extract");
+const { loadIndexFunctions, indexSource } = require("../lib/extract");
 
-function build(seedRows, albums) {
+function build(seedRows, albums, db) {
   const albumSeenCache = new Map(seedRows || []);
   const albumIndex = { albums: albums || [], builtAt: 1 };
   let bumped = 0;
@@ -31,7 +31,8 @@ function build(seedRows, albums) {
       albumIndex,
       // No SQLite in a unit test: the cache IS the assertion surface, and the
       // write path is a straight mirror of it.
-      stmtInsertSeen: null,
+      stmtInsertSeen: (db && db.stmt) || null,
+      labelsDb: (db && db.labelsDb) || null,
       bumpLibraryMeta: () => { bumped++; },
       DEBUG: false,
       console: { log: () => {}, error: () => {} },
@@ -81,11 +82,13 @@ test("the first run must not date the whole library at once", async (t) => {
   await t.test("an empty store records nothing", () => {
     // THE rule. Without it, every album in an established library gets the
     // same timestamp and "Recently added" becomes a perfectly sorted lie.
+    // Since 2.0.6-t4 the first run writes each album down as "undated" (known, never a date), so a library with no
+    // files of its own can tell what it adds afterwards; still no album is given a date.
     const { F, albumSeenCache, bumps } = build([], [album("a"), album("b"), album("c")]);
     F.recordFirstSeenAlbums();
-    assert.equal(albumSeenCache.size, 0,
-      "the first run has nothing to compare against, so it knows nothing");
-    assert.equal(bumps(), 0, "and nothing changed, so no cache invalidation");
+    assert.deepEqual([...albumSeenCache.values()].map((v) => v.src), ["undated", "undated", "undated"],
+      "the first run has nothing to compare against, so it dates nothing");
+    assert.equal(bumps(), 0, "and no date changed, so no cache invalidation");
   });
 
   await t.test("once anything is known, new albums are dated", () => {
@@ -112,4 +115,60 @@ test("the first run must not date the whole library at once", async (t) => {
     F.recordFirstSeenAlbums();
     assert.equal(albumSeenCache.size, 1);
   });
+});
+
+test("2.0.6-t4: a library with no files of its own (Qobuz alone, Rouen Lite) dates what it adds after the first run", async (t) => {
+  // The owner, 2026-11-23, on Rouen Lite with Qobuz alone: "library sort by … date added doesn't work. Same order
+  // regardless of ascending or descending". The first run was told apart by an empty store, and only the file scan
+  // ever put anything else in it: with no files, every rebuild was the first run, and nothing was ever dated.
+  await t.test("the first run is the first run once", () => {
+    const albums = [album("a"), album("b")];
+    const { F, albumSeenCache } = build([], albums);
+    F.recordFirstSeenAlbums();
+    const undated = (k) => albumSeenCache.get(k) && albumSeenCache.get(k).src === "undated";
+    assert.ok(undated("a") && undated("b"), "the library as it was: known, undated");
+    albums.push(album("c"));
+    F.recordFirstSeenAlbums();
+    assert.equal(albumSeenCache.get("c") && albumSeenCache.get("c").src, "first-seen", "an album added since is dated");
+    assert.ok(undated("a") && undated("b"), "and those there at the first run still aren't");
+  });
+
+  await t.test("an undated album is never shown with a date; a file's date still outranks it", () => {
+    const { F, albumSeenCache } = build([], [album("a")]);
+    const added = loadIndexFunctions(["albumAddedOf"], { albumSeenCache }).albumAddedOf;
+    F.recordFirstSeenAlbums();
+    assert.equal(added(album("a")), null, "known, not dated");
+    assert.equal(F.setAlbumSeen("a", 1000, "file"), true, "a file's date replaces it");
+    assert.equal(added(album("a")), 1000);
+  });
+
+  await t.test("the first run's rows are written in one transaction", () => {
+    const writes = [];
+    let open = false, transactions = 0;
+    const labelsDb = { transaction: (fn) => () => { transactions++; open = true; try { return fn(); } finally { open = false; } } };
+    const stmt = { run: (key, ts, src) => writes.push({ key, src, open }) };
+    const { F } = build([], [album("a"), album("b"), album("c")], { labelsDb, stmt });
+    F.recordFirstSeenAlbums();
+    assert.equal(transactions, 1);
+    assert.deepEqual(writes.map((w) => [w.key, w.src, w.open]), [["a", "undated", true], ["b", "undated", true], ["c", "undated", true]]);
+  });
+
+  await t.test("a store whose rows weren't read is never written (index.js: a failed open drops its statement)", () => {
+    const src = indexSource();
+    const fail = src.indexOf('console.error("[labels] db open failed:"');
+    assert.ok(fail > 0);
+    assert.match(src.slice(fail, fail + 400), /\n    stmtInsertSeen = null;   \/\/ /);
+  });
+
+  await t.test("a first run that saw no album takes nothing", () => {
+    const albums = [];
+    const { F, albumSeenCache } = build([], albums);
+    F.recordFirstSeenAlbums();
+    assert.equal(albumSeenCache.size, 0, "the Core not read yet: no first run taken");
+    albums.push(album("a"), album("b"));
+    F.recordFirstSeenAlbums();
+    assert.deepEqual([albumSeenCache.get("a").src, albumSeenCache.get("b").src], ["undated", "undated"],
+      "the library, when it comes, is the first run: undated, not dated now");
+  });
+
 });

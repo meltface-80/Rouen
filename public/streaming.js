@@ -10,6 +10,9 @@
  *
  * An album not in the library offers "Add to library" (album-actions.js RouenLibraryAdd, v1.9.41).
  *
+ * RouenStreaming.find(item) (2.0.6-t14): a suggestion (Smart Picks, the share card's "If you like this", Discover)
+ * opens the album view; its search (offerSearch) when Roon's search can't name it.
+ *
  * It draws into the shared grid through RouenHost (app.js), and an answer that lands after the grid
  * has gone to another screen draws nothing. The side menu's TIDAL and Qobuz entries open it by
  * their data-target: the two hidden buttons made here.
@@ -362,7 +365,81 @@
     b.addEventListener("click", () => open(service));
     document.body.appendChild(b);
   }
-  W.RouenStreaming = { open };
+  /**
+   * Roon's own search for q, begun from a service: the screen a search box gives (2.0.6-t12).
+   * @param {string} service @param {string} q
+   */
+  function search(service, q) {
+    const s = NAMES[service] ? service : "qobuz";
+    at = { service: "search", q: String(q || "").trim(), from: s, path: [], skip: [] };
+    draw();
+  }
+
+  /*
+   * A suggestion, wherever Rouen makes one (Smart Picks, the share card's "If you like this", Discover's new releases):
+   * a tap opens THE album view, the one every grid opens, for the album shown (2.0.6-t14; the owner, 2026-11-24: "You
+   * must make the share card and smart pick suggestions open to those albums that are shown … The album screens must be
+   * the uniform album screen for all albums in the grid screens"). 2.0.6-t12 opened Roon's search for it, a list to
+   * pick from, and from the share card that list was drawn behind Now playing.
+   *   In the library: at its place there, under Roon's own strings (the album view's identity check).
+   *   Not in it: at UNLISTED, past the end of every list, with its title and artist. The server finds nothing there and
+   *   finds the album by Roon's own search (index.js loadAlbumSession, lib/provider/public/album-search.js), as it does
+   *   for an album of your server's the official list has no row for (lib/roon-direct/library.js PAST_END): the album
+   *   view, its tracks and Roon's own Play Now, Queue and the rest, from Roon. Its ⋯ adds it to the library
+   *   (album-actions.js, `suggested`); if Roon's search can't name it, the view says so and offers that search here.
+   *   item: { offset?, artist?, album?, library_title?, library_subtitle?, image_key?, services?: [{ id }] }
+   */
+  /** Past every list's end, just short of library.js's PAST_END (1,000,000), whose offsets Roon has been asked at since
+   * v1.9.21: an offset of that size is proven, and no album of your server's is ever given this one. */
+  const UNLISTED = 999999;
+  /** @param {any} item */
+  const inLibrary = (item) => typeof item.offset === "number" && item.offset >= 0;
+  /** What Roon is asked for: the artist and the record. @param {any} item */
+  const query = (item) => [item.artist, item.album].filter(Boolean).join(" ").trim();
+  /** The service it would be added from: the one Share Card prefers among Roon's own (app.js preferredService). @param {any} item */
+  function serviceOf(item) {
+    const ids = (item.services || []).map((/** @type {any} */ x) => x.id).filter((/** @type {string} */ id) => NAMES[id]);
+    const choose = ids.length ? ids : Object.keys(NAMES);
+    const want = W.__preferredService ? W.__preferredService(choose) : choose[0];
+    return NAMES[want] ? want : choose[0];
+  }
+  /** Whether a tap has an album to open: a place in the library, or a record and its artist. @param {any} item */
+  const canFind = (item) => inLibrary(item) || !!(item.album && item.artist);
+  /** What the tap does, said before it is tapped. @param {any} item */
+  const findLabel = (item) => (inLibrary(item) ? "In your library \u203a" : "Open album \u203a");
+  /** @param {any} item @returns {boolean} whether it went somewhere */
+  function find(item) {
+    if (!canFind(item) || !W.__openAlbum) return false;
+    const lib = inLibrary(item);
+    if (W.__closeShareCard) W.__closeShareCard();   // from the share card: the album view is under it
+    // Not in it: added from the pick's own service and album where it names one (a Smart Pick, the review), else from
+    // the default among Roon's; its own picture until Roon's arrives, and the one kept if Roon can't name it. Back from
+    // the view goes back to what the card was over: Now playing, or an album (app.js openAlbum `back`).
+    const own = NAMES[item.service] ? item.service : null;
+    W.__openAlbum({ offset: lib ? item.offset : UNLISTED,
+      title: (lib && item.library_title) || item.album || "", subtitle: (lib && item.library_subtitle) || item.artist || "",
+      image_key: item.image_key || null, image_url: item.image || item.cover || null,
+      suggested: lib ? null : { service: own || serviceOf(item), album_id: (own && item.album_id) || null } }, { filter: null, back: true });
+    return true;
+  }
+  /**
+   * The album view's way on when Roon's search couldn't name a suggestion (app.js openAlbum): that search, here.
+   * @param {HTMLElement} row @param {{ title: string, subtitle: string, suggested: { service: string } }} album
+   */
+  function offerSearch(row, album) {
+    const b = el("button", "action-btn", "Search Roon for it \u203a");
+    /** @type {HTMLButtonElement} */ (b).type = "button";
+    b.addEventListener("click", () => {
+      if (W.__closeAlbum) W.__closeAlbum();
+      W.RouenStreaming.search(album.suggested.service, query({ artist: album.subtitle, album: album.title }));
+    });
+    // Under the words, whole: the action row is one line (nowrap), where beside them it was cut to "h Roon" (2.0.6-t16).
+    const said = row.querySelector(".modal-error");
+    if (said) { b.style.display = "flex"; b.style.marginTop = "12px"; b.style.width = "fit-content"; said.appendChild(b); }
+    else row.appendChild(b);
+  }
+
+  W.RouenStreaming = { open, search, find, canFind, findLabel, inLibrary, offerSearch, UNLISTED };
 
   // The side menu's entries, for the services your server offers — whatever Rouen's own sign-in, since browsing
   // them is your server's (the owner, after v1.9.42). Asked until your server answers (it may pair after the page loads).

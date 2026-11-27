@@ -24,7 +24,7 @@
         <p class="settings-pane-desc">The links under the card</p>
 
         <div class="settings-block">
-          <h3 class="settings-block-title">Services <button class="settings-info-btn" data-info="Each link opens the album on that service — usually as a search. Qobuz links are looked up in advance so they open the album itself in the Qobuz app. A suggestion that is already in your Roon library is queued instead." aria-label="About Services">ⓘ</button></h3>
+          <h3 class="settings-block-title">Services <button class="settings-info-btn" data-info="Each link opens the album on that service — usually as a search. Qobuz links are looked up in advance so they open the album itself in the Qobuz app. A suggestion under the card is queued when it is already in your Roon library, and otherwise opens Roon&#x27;s search for it here, from the default service." aria-label="About Services">ⓘ</button></h3>
           <!-- Filled from /api/settings/share-links: the list of what CAN be
                linked to lives in lib/share-links.js, so this screen and the
                chips can never disagree about which services exist. -->
@@ -251,4 +251,38 @@
         </div>
       </div>
 `);
+})();
+
+/*
+ * Rouen Lite (dev/design/rouen-lite.md §4, 2.0.6-t8; the owner, 2026-11-23: "Wall display wasn't removed as requested";
+ * 2.0.6-t10, Away from home too).
+ * The server says it is Lite (GET /api/settings/display answers lite: true there, lib/routes/display-settings.js) and
+ * keeps the wall display off, so its menu entry, the Shelf's button and the idle switch to it never show; here, the
+ * Wall Display and Away from home entries in Settings go too, and the page is marked (html.rouen-lite). The Plugins page (plugins.js) and
+ * Away from home (away.js) follow what the server lists for them on their own. Asked once, as the page loads: logging in
+ * reloads the page (login.js), so a page asked before its login asks again after it.
+ */
+(function litePage() {
+  "use strict";
+  /** Every script of the page run: an entry another one inserts (away.js, after this one) is there to hide. */
+  const loaded = () => new Promise((done) => {
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => done(undefined), { once: true });
+    else done(undefined);
+  });
+  fetch("/api/settings/display", { cache: "no-store" })
+    .then((r) => (r.ok ? r.json() : null))
+    .then(async (j) => {
+      if (!j || j.lite !== true) return;
+      // The answer can come before away.js has run (2.0.6-t10): wait for the page's scripts, then hide.
+      await loaded();
+      document.documentElement.classList.add("rouen-lite");
+      // The Wall Display (2.0.6-t8), and Away from home with its Tailscale (2.0.6-t10; the owner, 2026-11-24: away
+      // from home in Rouen Lite shelved, "Remove it and tailscale from Rouen lite only"). away.js inserts its entry
+      // before this answer comes.
+      for (const pane of ["display", "away"]) {
+        const entry = document.querySelector('.settings-nav-item[data-pane="' + pane + '"]');
+        if (entry) entry.classList.add("hidden");
+      }
+    })
+    .catch(() => { /* no answer: the page stays as it is everywhere else; the server still refuses the wall display */ });
 })();

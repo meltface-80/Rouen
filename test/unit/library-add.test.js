@@ -117,3 +117,10 @@ test("the routes: a malformed request is 400; the add and its state answered; th
   assert.deepEqual((await call("POST /api/qobuz/favorite", { body: { album_id: 6 } })).body, { ok: true });
   assert.deepEqual(set, [["tidal", "5", false], ["qobuz", "6", true]]);
 });
+
+test("§13.2, the review: a device with no Roon profile of its own adds nothing — no service favourite in its place", async () => {
+  const { WHY_NOBODY } = require("../../lib/roon-direct/session");
+  const { la, calls } = rig({ adderSays: { notSent: WHY_NOBODY } });
+  assert.deepEqual(await la.add(EVIL), { error: WHY_NOBODY, status: 409 });
+  assert.deepEqual([calls.favourites, calls.searches], [[], []], "THE one: added with the household's service sign-in");
+});

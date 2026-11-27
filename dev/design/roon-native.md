@@ -16,6 +16,14 @@ Roon Remote is."* So Roon's private protocol becomes the source wherever it has 
 area, each read-only before any write; the public extension API stays as the fallback for whatever
 is off, failing, or not yet moved (§3, and `CLAUDE.md`).
 
+And on 2026-11-24, of an album's dates: *"We are using the Roon reverse code here so the date on the album
+screen should be coming from there and therefore the date on the share card should be from the same source. We
+need to stop relying on API's wherever possible and use the official API and the reverse code to bridge missing
+gaps."* So **outside services (MusicBrainz, Qobuz's and TIDAL's own APIs, Discogs and the rest) are gap-fillers,
+not sources**: where Roon's private protocol or its public API states a fact, Rouen shows Roon's, and an outside
+service is asked only for what neither of Roon's gives. The dates are the first moved (`recently-added.md` §4–5,
+2.0.6-t15).
+
 That means retiring three workarounds:
 
 | Workaround today | Why it exists | What it gets wrong |
@@ -46,6 +54,7 @@ methods catalogued; typed wrappers generated for all of them.
 | Roon's own Listen Later | `Library.SetListenLaterState(...)`, `GetListenLater(...)` | `GetListenLater` proven (v1.9.37); `SetListenLaterState` proven, its add (Pending) by the copy and its removal (None) by hand (v1.9.45–47, `native-remote.md` §10.5) |
 | Roon's smart playlists: their tracks, and played | `Playlist::VirtualItemsQuery` and its pages (read); `Transport::PlayPlaylist(Zone, Sooid, PlayParameters, Playlist, PlaylistItem, ResultCallback<PlayFeedback>)` (N2e-1, v1.9.51, `native-remote.md` §12.3) | The items query proven on the owner's server (v1.9.50, §12.2); `PlayPlaylist` **proven on the owner's server**, Play and Shuffle (v1.9.51, 2026-10-22, `native-remote.md` §12.4) |
 | A Roon smart playlist made from one of Rouen's Dynamic Playlists | `Playlists::CreatePlaylistFromParameters(PlaylistParameters, ResultCallback<Playlist>)` (N2e-2b, v1.9.53, `native-remote.md` §12.7: the one test, by hand) | **Proven on the owner's server** (v1.9.53, 2026-10-22, `native-remote.md` §12.8): checked in Roon |
+| A Roon profile made, and renamed (two-way profiles, `profiles.md` §13) | `Account::CreateProfile(ProfileCreate, ResultCallback<Profile>)` on the root graph's Account, only its Name sent; `Profile::Edit(ProfileEdit, ResultCallback)`, only its Name (P3-probe, `profile-probe.js`, by hand: `GET /api/debug/roon-profile-probe?run=1`) | **Proven on the owner's server** (P3-probe, 2026-11-26 19:45): made, on the Account's own list, renamed and read back. `Profile::Delete`: catalogue only, sent by the probe on the profile it made (2.0.8-t7), until the owner's run shows it |
 | A Roon smart playlist's Focus changed from Rouen | `Playlists::UpdatePlaylist(Playlist, PlaylistParameters, ResultCallback)` (N2e-3a, v1.9.55, `native-remote.md` §12.9: tried once, by hand; its form varied by hand in v1.9.56, §12.10: the parameters with or without `PlaylistId` and `Profile`, and with the playlist's `Description` and `PlaylistFolderId`, never without `Name`) | **Refused "InvalidArgument"** on the owner's server in its v1.9.55 form (§12.10) |
 | Play, pause, next, previous, stop, seek, shuffle, repeat, Radio, volume and mute | `Zone::Play()` / `Pause()` / `PlayPause()` / `Stop()` / `Next()` / `Previous()` / `Seek(int, ResultCallback)` / `SetShuffle(bool)` / `SetLoop(LoopMode)` / `SetAutoSwim(bool)`; `Endpoint::SetVolumeDouble(double, ResultCallback)` / `IncrementVolumeDouble(double, ResultCallback)` / `SetMute(bool)` (N3-2, v1.9.65, `native-remote.md` §14.3; the zone found by its id, proven by §14.2's probe) | `Zone::Pause` run live upstream; the rest not run by Rouen before v1.9.65 |
 | TIDAL / Qobuz favourites, as Roon sees them | `Tidal.GetFavoriteAlbums`, `Qobuz.GetFavoriteAlbums` | Not run live |
@@ -79,7 +88,8 @@ methods catalogued; typed wrappers generated for all of them.
   transport, browse and images stay on the public API until an area is moved, each move a stage of
   its own: proven read-only on the owner's Core, then switched on. Whatever is off or failing falls
   back to the public API's way, so Rouen always works without it.
-- **Optional, and off until proven.** Settings → Roon → "Roon direct (experimental)". Off: Rouen
+- *(Replaced by §11 on 2026-11-26: always on, suspended rather than off when it fails.)* **Optional, and off until
+  proven.** Settings → Roon → "Roon direct (experimental)". Off: Rouen
   behaves exactly as today. On and failing: Rouen says so plainly and falls back to today's
   behaviour; nothing silently degrades to a guess presented as fact.
 - **One connection, a short allowlist of methods.** A module may call only the methods named in
@@ -125,6 +135,9 @@ run on the owner's Core.
 | **3e — track times** (`native-remote.md` §16.6, v1.9.70-t14) | Each track's length on the album page, read when the page asks | `Library::GetAlbumTrackLites(AlbumBase)`: read only, proven on the owner's server by the reads probe (2026-10-28) | — (Roon's public API gives none) |
 | **N7-0 — the reads full native mode rests on** (`native-remote.md` §16.4, v1.9.70-t3) | Each read once, by hand (`/api/debug/roon-native-reads?run=1`), answers given whole, so the builds of §16.3 are written against what the server sends | `Queue::GetItems`; `Library::GetAlbum(AlbumBase)`, `GetAlbumTrackLites(AlbumBase)`, `GetPerformer(PerformerBase)`, `GetToplevelGenres(GetGenreParameters)`, `GetAllTagLites(Profile)`: read only, never run upstream nor by Rouen | — (a probe) |
 | **Plays on / Appears on** (`plays-on.md`, v2.0.3-t1 to -t3) | The library records that credit an artist, by credit kind: a probe run by hand (`/api/debug/roon-plays-on?run=1`), then the artist page's "Appears on" | none new: `VirtualAlbumQuery` with the four `Require…` performer lists (LengthPrefixed, as `RequireLocations`), its paging and Dispose, and `GetAlbum` — run on the owner's server by the probe (v2.0.3-t2) | read only |
+| **Recently added from Roon** (`recently-added.md`, 2.0.6-t5) | Roon's own date added for the Recently added sort (the owner, 2026-11-23); first a probe run by hand (`/api/debug/roon-added?run=1`, §3) | none new: `VirtualAlbumQuery` with an `Ordering` {`ImportDate`, a `Direction`} in its criteria (the `AlbumQueryOrdering` a smart playlist's Focus carries, §12.15 of `native-remote.md`), its paging and Dispose — run on the owner's server three times (§3.1–3.3) | read only |
+| **Suggestions from Roon** (`roon-suggestions.md`, 2.0.6-t17) | Smart Picks and the share card's suggestions from Roon alone: its `SeeAlso`, its similar artists (`SimilarTo`), and its own search (the owner, 2026-11-24: "they must come from Roon and not Qobuz or other means"); first a probe run by hand (`/api/debug/roon-suggest?run=1`, §4) | none new: `GetAlbum`, `GetPerformer` (also on a performer `SimilarTo` names, not yet tried), `UnifiedSearch` and its `Dispose` | read only |
+| **Dates from Roon** (`recently-added.md` §4–5, 2.0.6-t15) | Each album's `ImportDate` (Recently added, Added in the last) and `OriginalReleaseDate` / `ReleaseDate` (the album screen, the share card, the Release date sort, Decade) from the library read Rouen already makes; outside services only fill the gaps (§1, the owner, 2026-11-24) | none: the members the library read's `AlbumLite` already carries, their forms proven on the owner's server (§3.3) | read only |
 | **Playlist artists** (`playlist-artists.md`, v2.0.3-t4) | Each track's own artist in an ordinary Roon playlist, for its page, and a probe beside the official API's line (`/api/debug/roon-playlist-artists?run=1`) | none new: `Playlist::VirtualItemsQuery`, its paging and Dispose, as proven for smart playlists (§12.2) — not yet run on an ordinary playlist on the owner's server | read only |
 | **An album's versions** (`album-versions.md`, v2.0.3-t16) | The album view's Versions: the library's copies, its other releases and the streaming ones, each one's tracks, and one played whole; and a probe run by hand of what makes one the default one (`/api/debug/roon-album-versions?run=1`, §5) | `Transport::PlayAlbum(Zone, Sooid, PlayParameters, AlbumBase, bool favoritesonly, bool includehidden, ResultCallback<PlayFeedback>)`, new: upstream's generated client's, heard playing upstream; its arguments read as `PlayPlaylist`'s (proven, §12.4), not yet run by Rouen. The read is `GetAlbum` (proven) and, for a version's tracks, `GetAlbumTrackLitesIncludingHidden(AlbumBase)` (2.0.3-t21: the catalogue's twin of the proven `GetAlbumTrackLites`, not yet run on a server, its argument and answer read as the twin's, a duplicate's hidden tracks included; refused, the plain read is asked), the probe `GetMultiAlbumEditInfo` (proven). The write that makes a version the default one (`Library::Edit`, an `AlbumEdit`'s `DuplicateOf`) is not on the allowlist: designed from the probe's run, tried once by hand first (`album-versions.md` §6) | — (the official API carries no versions) |
 | **A playlist's items moved and removed** (`playlist-edit.md`, 2.0.4-t12) | Reorder and remove a Roon playlist's tracks; first a probe run by hand (`/api/debug/roon-playlist-edit?run=1`, §3) on a playlist it makes and deletes | `Playlists::MoveItems(Playlist, IEnumerable<PlaylistItem>, InsertionPoint, PlaylistItem, ResultCallback)` and `Playlists::RemoveItems(Playlist, IEnumerable<PlaylistItem>)`, the catalogue's; **proven** by the probe on the owner's server (2026-11-10: moved as asked by the same item ids, removed, §3.1), and used from 2.0.4-t13 by the page's edit mode (§4), each change read back before it is believed. Their arguments read as `InsertTracks`'s, the items `VirtualItemsQuery`'s. Around the probe's only proven calls: `CreatePlaylist`, `InsertAlbums`, `Delete` | — (the official API can't change a playlist) |
@@ -165,7 +178,9 @@ Roon never gives an extension — public or internal API — the audio. So:
 - **Waveforms** need the samples: local files through `/music`, streaming through the service's own
   signed URLs (the Qobuz/TIDAL sign-ins). Retire both and waveforms go.
 - **File-tag dates and labels** come from the `/music` walk today. Roon's album objects may carry
-  both; unverified until stage 0/1.
+  both; unverified until stage 0/1. **Dates: verified and moved** (2.0.6-t15): Roon's album carries its release
+  dates and its date added, and they are Rouen's first source (`recently-added.md` §3.3–5); file tags and the
+  outside services fill only what Roon leaves out.
 
 ## 6. Testing
 
@@ -202,7 +217,8 @@ as the native remote widens to writes: the login comes first (`dev/design/native
 3. **Listen Later moves to Roon's own** (`SetListenLaterState` / `GetListenLater`) once the write path
    is approved — a stage of its own after stage 2.
 4. **Profile picker.** Favourites, Listen Later and add-to-library act for the Roon profile chosen in
-   Settings → Roon; the list comes from the Core.
+   Settings → Roon; the list comes from the Core. Since 2.0.7-t4, a Rouen profile linked to another of the Core's
+   profiles does those three as that one on its devices (`profiles.md` §5, §11 P2).
 5. **Opt-in, always.** Roon direct is off until the user turns it on. Both versions are recorded when
    the user opts in. **Changed on 2026-10-14 (the owner, as Rouen moves towards a native Roon UI):**
    after any update — a new Rouen version, a new Roon Core version, or another Core — it no longer
@@ -469,3 +485,87 @@ as Roon's answer. Off, Rouen behaves exactly as without stage 1.
 Asked with them, and answered the same day: the goal is now a native Roon UI (§1), so the private
 protocol becomes the source wherever proven (§3, `CLAUDE.md`); and after an update Roon direct
 checks itself rather than turning off (§8.5).
+
+## 11. Always on (the owner, 2026-11-26; 2.0.6-t21)
+
+> "I also want native mode to be permanently on no toggle switch to turn it off. But I do want fall back to full
+> official API if native mode starts to have errors due to roon closing the reverse code path."
+
+And, asked the same day:
+
+1. **When it tries again after failing: "Nightly + on updates".** At the nightly reconnect (04:00), when Rouen or the
+   server updates, and when Rouen restarts. In between, everything runs on the official API.
+2. **An emergency off: "Container setting only".** No switch in the app. Whoever runs the container can start it with
+   `ROUEN_NATIVE=off`, as `ROUEN_RESET_PASSWORD` is set; Rouen Lite reads the same from `"native": "off"` in its
+   `settings.json`, for whoever can reach the app's files (adb).
+3. **Installs whose owner answered No at the one-time choice (`login.md` §5): "Keep their No".** They were told the
+   answer was permanent: native mode stays off for them, as now. Everyone who answered Yes, and every new install,
+   has it always on. The setup sheet stops asking the native-mode question; a new install is on.
+
+This replaces §3's "Optional, and off until proven", §8.5's "it turns off and says why", §8.6 and §10.4's switch and
+"turns it off", and `native-remote.md` §3.3's "only the check after an update still turns it off".
+
+### 11.1 What the user sees
+
+- **Settings → Native mode** keeps its page, its notice ("Read this first", above the status as before) and its status
+  board. The switch's row becomes "Native mode: always on" with its ⓘ, and no switch. The status line reads, in turn:
+  - in use: the connection, what was matched and the last read, as before;
+  - "Checking after an update (…)…" after an update, or "Trying native mode again (…)…" for a try (§11.2);
+  - "Not in use since <when>: <why>" and "Rouen is using the official extension API for everything. It tries native
+    mode again at 04:00, or when Rouen or your server updates, or when Rouen restarts.";
+  - "Off: The container was started with ROUEN_NATIVE=off." (the emergency off).
+  - A server whose address Rouen doesn't know is a suspension like any other (it used to turn native mode off), said
+    with that why and tried again as below.
+- The notice says how to turn it off in an emergency (`ROUEN_NATIVE=off`; Rouen Lite's settings file) and that a
+  server update can break it, Rouen then using only the official API until the next try.
+- **An install that answered No** sees no Native mode page, as now.
+- **The setup sheet** (a new install) asks only about accounts, and says native mode is always on.
+- **Hearts' profile** is still chosen on the page when the server has several.
+
+### 11.2 Failing, and trying again
+
+Two kinds of trouble, told apart:
+
+- **A dropped connection** (the server restarting, the network gone): the link opens again as now (30 s, doubling to
+  5 min), and features fall back one by one meanwhile (`native-remote.md` §3.3). Not "failing": nothing is
+  suspended, nothing waits for 04:00, whatever was pending (a check waits for the next opening).
+- **The path closed or broken** — what a Roon update that closes the private protocol looks like:
+  1. the check after an update, or a try (below), fails: its read fails;
+  2. the server answers the connection and refuses it: every broker id tried refused (one id is the wrong one and is
+     refused as such, so a refusal beside a timeout on the other is a drop);
+  3. openings that reach the server and fail before a session is up (the handshake closed or garbled, the root
+     service unanswered or closed, the graph without its Library), **three or more, for half an hour**: a server
+     restarting can look like this for a few minutes;
+  4. three reads of the library in a row that fail, on three different sessions.
+
+  Any of these **suspends** native mode: the link is stopped, every feature steps aside as when native mode is off
+  (the official list, Rouen's own answers, the official API's ways), the saved sources are deleted, and the page says
+  why and since when. Nothing native is sent until the next try. A server that only times out is never called
+  broken: one that is off cannot be told from one that ignores Rouen.
+- **The next try:** at 04:00 by the container's clock (the nightly reconnect's hour; Docker's is UTC unless set), at
+  Rouen's start, and when pairing shows the server's version, or the server itself, changed. A try opens the link and
+  reads the library as the check after an update does; whole, native mode is in use again and the suspension is
+  cleared; failed, it stays suspended with the new why until the next try. Never more often than that (the owner's
+  answer 1). A try whose server is out of reach waits for it, saying "Trying native mode again", as a check does.
+
+### 11.3 How it is kept and built
+
+- Native mode is in use unless the install answered No (`choices.native === false`) or the emergency off is set. A
+  saved `on: false` from the switch is read as on.
+- `roonDirect.suspended: { why, at }` (null when in use) replaces `offReason` and `offAt`. In `stage1.js`, `turnOff`
+  with a reason suspends (and arms the 04:00 try); without one it is the No's off. The features' `on` is false while
+  suspended, so each takes today's way.
+- The link has no state of its own for this: `stage1.js` stops it when suspended and starts it for a try. It says
+  when the path is broken (`onBroken`, items 2 and 3 above); `always-on.js` `openingFault` reads its errors.
+- `POST /api/roon-direct` (the switch) is gone; `POST /api/roon-direct/profile` went in 2.0.8-t2 (`profiles.md` §13.2: native
+  mode is not tied to a profile; each Rouen profile's own is paired in Settings → Profiles).
+- The emergency off: `ROUEN_NATIVE=off` on the container, or `"native": "off"` in the settings file (meant for Rouen
+  Lite, read in every build). Read at start only. Never in a backup (`lib/backup.js` NEVER_KEYS), so a restore
+  cannot turn native mode off: nothing in the app does.
+- `lib/choices.js`: the native question goes from the sheet; `POST /api/choices` ignores a `native` sent and records
+  `native: true`; an install that already chose keeps its answer.
+- Tests, each broken on purpose once (`test/unit/roon-direct-always-on.test.js`, the stage 1 tests, the page's and
+  the setup sheet's DOM tests): a saved `on: false` is on; a No stays off, with no page; the emergency off, which the
+  choice cannot pass; each of §11.2's failures suspends and the features step aside; a drop, a refusal beside a
+  timeout, and failures for less than half an hour do not; the tries at 04:00, at start, after an update, and none
+  between; a try that works clears the suspension; the page has no switch.

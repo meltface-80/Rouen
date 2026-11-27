@@ -3,7 +3,8 @@
  * app-files.js — what the page hands out as a file: the share card's picture (Copy image, Share…, Download; moved out
  * of app.js in v1.9.72-t22) and the page's downloads (a shared playlist's .musicd, the labels scan log, a backup;
  * v1.9.72-t24). In a browser, the browser's own ways; in the Android app, whose WebView has none of them, the app's
- * (window.RouenPhone: CardShare.kt, SavedFile.kt; dev/design/android-app.md §4.17).
+ * (window.RouenPhone: CardShare.kt, SavedFile.kt; dev/design/android-app.md §4.17); in Rouen Lite, its own
+ * (window.RouenLite: cardCopy, CardCopy.kt; fileSave, SavedDownload.kt; dev/design/rouen-lite.md §3).
  * Copyright (c) 2026 Lewis Menzies (Music Duck / MusicD)
  * Released under the MIT License. See the LICENSE file for details.
  *
@@ -53,8 +54,9 @@
   }
 
   /**
-   * The Android app's two, when the page is in it: each takes the PNG as base64 and the file name, and answers
-   * {"ok": true} or {"error": "…"} as JSON text (RouenPhone.kt). Null in a browser, or in an app too old to have them.
+   * The app's two, when the page is in one: each takes the PNG as base64 and the file name, and answers
+   * {"ok": true} or {"error": "…"} as JSON text (RouenPhone.kt). Null in a browser, in an app too old to have them, and in
+   * Rouen Lite, whose bridge saves files alone (2.0.6-t9: build() gives it Download through that).
    * @returns {{ cardCopy: Function, cardSave: Function } | null}
    */
   function appCard() {
@@ -118,6 +120,37 @@
       };
       appBtn("ghost", "copy", "Copy image", "Copied!", (/** @type {string} */ png, /** @type {string} */ name) => app.cardCopy(png, name));
       appBtn("ghost", "download", "Download", "Saved to Pictures", (/** @type {string} */ png, /** @type {string} */ name) => app.cardSave(png, name));
+      hintEl.textContent = "Tap a button above, or long-press the card to save.";
+      return;
+    }
+
+    // Rouen Lite: Copy image through its bridge's cardCopy (2.0.6-t11; the owner: "I said it was failing to copy and to
+    // fix it, not remove it"), the card saved to Pictures/Rouen and its address on the clipboard, with no provider and no
+    // permission (2.0.6-t6's way, a FileProvider and the storage permission, was blocked by Google Play Protect); and
+    // Download through fileSave, to Downloads/Rouen. The WebView's own clipboard refuses images and its download link
+    // goes nowhere (dev/design/rouen-lite.md §3).
+    const W = /** @type {any} */ (window);
+    if (W.RouenLite && typeof W.RouenLite.fileSave === "function" && W.RouenFiles) {
+      if (typeof W.RouenLite.cardCopy === "function") {
+        const c = mkBtn("ghost", icon("copy"), "Copy image");
+        c.onclick = async () => {
+          errEl.textContent = "";
+          try {
+            await inApp((/** @type {string} */ png, /** @type {string} */ name) => W.RouenLite.cardCopy(png, name), blob, fileName);
+            setLabel(c, "Copied!"); setTimeout(() => setLabel(c, "Copy image"), 2500);
+          } catch (e) { errEl.textContent = /** @type {Error} */ (e).message || String(e); }
+        };
+        actions.appendChild(c);
+      }
+      const b = mkBtn("ghost", icon("download"), "Download");
+      b.onclick = async () => {
+        errEl.textContent = "";
+        try {
+          const said = await W.RouenFiles.save(blob, fileName);
+          setLabel(b, said || "Saved"); setTimeout(() => setLabel(b, "Download"), 2500);
+        } catch (e) { errEl.textContent = /** @type {Error} */ (e).message || String(e); }
+      };
+      actions.appendChild(b);
       hintEl.textContent = "Tap a button above, or long-press the card to save.";
       return;
     }
@@ -212,9 +245,10 @@
 (() => {
   "use strict";
 
-  /** The app's fileSave, when the page is in an app that has it. @returns {Function | null} */
+  /** The app's fileSave, when the page is in an app that has it: Rouen for Android, or Rouen Lite. @returns {Function | null} */
   function appSave() {
-    const app = /** @type {any} */ (window).RouenPhone;
+    const W = /** @type {any} */ (window);
+    const app = W.RouenPhone && typeof W.RouenPhone.fileSave === "function" ? W.RouenPhone : W.RouenLite;
     return app && typeof app.fileSave === "function" ? (/** @type {string} */ data, /** @type {string} */ name) => app.fileSave(data, name) : null;
   }
 

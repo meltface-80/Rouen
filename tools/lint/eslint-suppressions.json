@@ -1,7 +1,7 @@
 {
   "index.js": {
     "no-empty": {
-      "count": 9
+      "count": 6
     },
     "no-promise-executor-return": {
       "count": 12
@@ -10,7 +10,7 @@
       "count": 1
     },
     "no-use-before-define": {
-      "count": 46
+      "count": 44
     }
   },
   "lib/discovery.js": {
@@ -67,7 +67,7 @@
       "count": 2
     },
     "no-use-before-define": {
-      "count": 36
+      "count": 35
     }
   },
   "test/dom/album-actions-row.test.js": {

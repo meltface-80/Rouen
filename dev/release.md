@@ -241,6 +241,26 @@ The user manually publishes releases on GitHub when they are satisfied with test
 
 ---
 
+## The docs site (since 2.0.8)
+
+The owner, 2026-11-27: "Make the GitHub.io look like Mandarin's version which is much cleaner." Until 2.0.8 the site was
+one page (`docs/index.html`, 8,317 lines, its eight languages inline). Since 2.0.8 it is laid out as Mandarin's site is:
+
+- `index.html`: the contents. The hero (the two logos, the version badge, Install, What's new, Features), then cards in
+  three groups (Get started, Using Rouen, Setting up and help), one per page. An address of the one-page site
+  (`#install`, `#native`, `#how-shelf` …) opens its page (a script at the top of `index.html`).
+- One page a subject: `install.html` (with `install.js`, the command builder), `windows.html`, `unraid.html`,
+  `android.html`, `features.html`, `hqpweb.html`, `api-keys.html`, `environment.html`, `first-run.html`,
+  `uninstall.html`; `queue-history.html` is the one page with its own look, as before.
+- `site.css`: Mandarin's site's, with Rouen's own parts at its end. `site.js`: the feature cards' ⓘ, the Copy buttons
+  and the contents page's live version. `i18n.js`: Mandarin's (stored as `rouen-lang`); each language's words are
+  `i18n/<lang>.json`, keyed by `data-i18n` as before, English being the pages' own text. `fonts/`: Manrope and Young
+  Serif, Mandarin's.
+
+**A promotion's version** is in: `index.html` (the badge and the two `.ver`), `install.js` (`FALLBACK_VERSION`),
+`install.html` (`ver-line`), `windows.html` and `features.html` (the Windows file names), `android.html`, and the same
+places in each `i18n/<lang>.json`. `grep -rn "<old version>" docs` finds every one.
+
 ## README.md — frozen until told otherwise
 
 - The README contains version references: its title and the "new in vX" feature entries. Its
@@ -252,7 +272,29 @@ The user manually publishes releases on GitHub when they are satisfied with test
   the GitHub.io site. No point repeating everything").** Its title line carries the version; its links go to the
   site's sections (Features, Install, Windows, Unraid, Rouen for Android, Rouen + HQPWeb, Uninstall). The Windows
   steps and the hqpweb usage live on the site only; the README keeps the hqpweb credit and its link.
-- Current version in the README: **v2.0.5**, at the owner's word (2026-11-11: "bump to v2.0.5 and merge to main. Do
+- Current version in the README: **v2.0.8**, at the owner's word (2026-11-27: "Let's do the merge from dev to main").
+  Profiles shared with Roon both ways, Smart Picks found and added through Roon with no streaming sign-in, and Discover
+  on Home; one short entry (New, Changed, Fixed) for everything since v2.0.5, as v2.0.6 and v2.0.7 were held and never
+  released; 2.0.8-t1 to t11 folded into it. Its release branch into `dev` bumped 2.0.8-t11 to 2.0.8 and carried the
+  promotion (the README's title, the docs site's badge, fallback, version lines and Windows file names in all nine
+  languages, this note, `dev/history.md`). Claude merges it into `dev`, then `dev` into `main`, at that word. The docs
+  site's restyle after Mandarin's ("Make the GitHub.io look like Mandarin's version which is much cleaner") follows on
+  a docs-only branch.
+- Before that the README pointed at **v2.0.7** (never released: held for profiles shared with Roon), at the owner's word (2026-11-26: "Fix flaky test and the update dev to
+  main. Again, release notes are short and precise: New, Changed, Fixed. Not war and peace"). Profiles, and Smart Picks
+  that follow the listening; one short entry (New, Changed, Fixed) for everything since v2.0.5, as v2.0.6 was held and
+  never released; 2.0.7-t1 to t6 folded into it. Its release branch into `dev` bumped 2.0.7-t6 to 2.0.7 and carried the
+  promotion (the README's title, the docs site's badge, fallback, version lines and Windows file names in all nine
+  languages, this note, `dev/history.md`). Claude merges it into `dev`, then `dev` into `main`, at that word.
+- Before that the README pointed at **v2.0.6** (never released: held for profiles), at the owner's word (2026-11-26: "Merge dev into main to update. Release
+  notes, only lists what new, changed, fixed since the last latest version. Do not list each stage of the Dev builds
+  between last latest and this latest. Short but concise release notes. Not war and peace"). Smart Picks follows the
+  listening, native mode always on, suggestions open inside Rouen; 2.0.6-t1 to t22 are folded into one short entry
+  (New, Changed, Fixed), Rouen Lite left out (it is released only on `test-lite`). Its release branch into `dev` bumped
+  2.0.6-t22 to 2.0.6 and carried the promotion (the README's title, the docs site's badge, fallback, version lines and
+  Windows file names in all nine languages, native mode's "how to" now saying it has no switch, this note,
+  `dev/history.md`). Claude merges it into `dev`, then `dev` into `main`, at that word.
+- Before that the README pointed at **v2.0.5**, at the owner's word (2026-11-11: "bump to v2.0.5 and merge to main. Do
   the usual and promote etc. PR and merge when all green. Keep release notes brief. Fixed playlists artist used"). A
   playlist's tracks show their artist, not the composers; 2.0.5-t1 is folded into its entry (Fixed only). Its release
   branch into `dev` bumped 2.0.5-t1 to 2.0.5 and carried the promotion (the README's title, the docs site's badge,

@@ -37,8 +37,13 @@ test("the whole list, every page: each album's title, artist, ContentSource and 
   assert.equal(out.albums.length, 250, "THE one: every album of the Count, not a page of them");
   const a = out.albums.find((x) => x.title === "Album 4");
   assert.deepEqual(a, { oid: "50004", title: "Album 4", artist: "Artist 4", contentSource: 128, imageKey: "img4",
-    albumId: "7000000000004", favorite: true, format: null, genres: null }, "no format or genres sent: null, not guessed (v1.9.70-t5)");
+    albumId: "7000000000004", favorite: true, favBy: { cafebabe: true, deadbeef: false }, format: null, genres: null,
+    importDate: null, added: null, released: null, originalRelease: null, releaseDate: null },
+    "no format, genres or dates sent: null, not guessed (v1.9.70-t5, 2.0.6-t7, 2.0.6-t15)");
   assert.equal(out.albums.find((x) => x.title === "Album 5").favorite, false, "THE one for v1.9.27: another profile's heart was taken as Rouen's");
+  // Every profile's from the same read (profiles.md §5, 2.0.7-t4): the other profile's heart, as its own.
+  assert.equal(out.albums.find((x) => x.title === "Album 5").favBy.deadbeef, true, "another Roon profile's heart not read");
+  assert.notEqual(out.albums.find((x) => x.title === "Album 6").favBy.cafebabe, true, "a heart nobody set read as one");
   assert.deepEqual([...new Set(out.albums.map((x) => x.contentSource))].sort(), [1, 128, 256]);
   assert.deepEqual(core.rec.albumQueries, ["all"], "one query, with no criterion");
   assertTidy(core.rec, out);
@@ -186,4 +191,56 @@ test("v1.9.70-t5 (the review): an AlbumFormat the server shares between albums, 
   const rateOf = (/** @type {string} */ title) => { const a = out.albums.find((x) => x.title === title); return a.format && a.format.rate; };
   assert.deepEqual(["Album 2", "Album 3", "Album 120", "Album 5"].map(rateOf), [96000, 96000, 96000, 44100],
     "THE one: the shared AlbumFormat, let go after the first album read, is still the later albums' format");
+});
+
+// 2.0.6-t7 (dev/design/recently-added.md §3.2): an album's ImportDate, as the server sends it, kept raw on its record —
+// sent whole, and again on a second read of the same connection, where the server sends only rows and the album is the
+// one known from the first.
+test("an album's ImportDate and release dates are kept, and read as dates, on a first read and on a second read of the same connection", async (t) => {
+  const { connectFirst, readRoot } = require("../../lib/roon-direct/session");
+  const { guarded } = require("../../lib/roon-direct/methods");
+  const { brokerIdCandidates } = require("../../lib/roon-direct/brokerid");
+  const { readAlbumsOn } = require("../../lib/roon-direct/albums");
+  const albums = many(5);
+  albums[2].importDate = "5250997338147387904";   // the owner's server's "When It Falls": a DateTime's ToBinary, past a Number's precision
+  albums[2].originalReleaseDate = (2001 << 16) | (6 << 8);   // 2.0.6-t15: a NullDate, June 2001
+  albums[2].releaseDate = (2001 << 16) | (6 << 8) | 4;       // …told to the day by its ReleaseDate
+  const core = await startFakeCore({ brokerId: dotnetGuidBytes(CORE_ID), albums, faults: { sentOnce: true } });
+  t.after(() => core.close());
+  const first = await connectFirst({ host: "127.0.0.1", port: core.port, timeoutMs: fast.timeoutMs, candidates: brokerIdCandidates({ coreId: CORE_ID }) });
+  assert.ok(first.session);
+  t.after(() => first.session.close());
+  const s = { g: guarded(first.session.remoting), graph: first.session.graph, root: await readRoot(guarded(first.session.remoting), first.session.graph, fast.settleMs) };
+  const one = await readAlbumsOn(s, fast);
+  assert.equal(one.ok, true, one.why);
+  assert.equal(one.albums.find((x) => x.title === "Album 2").importDate, "5250997338147387904", "THE one: kept whole, not through a Number");
+  assert.equal(one.albums.find((x) => x.title === "Album 1").importDate, null, "not sent: null");
+  // 2.0.6-t15 (recently-added.md §4–5): read as dates, as the owner's server declares them.
+  assert.equal(new Date(one.albums.find((x) => x.title === "Album 2").added).toISOString(), "2026-11-24T15:46:12.000Z");
+  assert.equal(one.albums.find((x) => x.title === "Album 2").released, "2001-06-04");
+  assert.equal(one.albums.find((x) => x.title === "Album 1").added, null);
+  assert.equal(one.albums.find((x) => x.title === "Album 1").released, null);
+  const known = new Map(one.albums.map((x) => [x.oid, x]));
+  const two = await readAlbumsOn(s, Object.assign({ known }, fast));
+  assert.equal(two.ok, true, two.why);
+  assert.equal(two.albums.find((x) => x.title === "Album 2").importDate, "5250997338147387904", "rows alone: the album as known, its date kept");
+  assert.equal(two.albums.find((x) => x.title === "Album 2").released, "2001-06-04", "…and its release date");
+  assert.equal(new Date(two.albums.find((x) => x.title === "Album 2").added).toISOString(), "2026-11-24T15:46:12.000Z");
+});
+
+// The review (2.0.6-t15): an update the server pushes may carry one of the two release dates alone. It is read with the
+// other as known on this connection, never as the album's only date — a remaster's ReleaseDate pushed alone must not
+// become the album's date over its known original.
+test("an update carrying one release date alone is read with the other as known", () => {
+  const { datesOf } = require("../../lib/roon-direct/albums");
+  const { BinaryWriter } = require("../../lib/roon-direct/wire");
+  const nd = (y, m, d) => new BinaryWriter().integer((y << 16) | (m << 8) | d).toBuffer();
+  const known = { originalRelease: "1973-03-28", releaseDate: "1973-03-28", released: "1973-03-28" };
+  const push = (fields) => ({ fields });
+  assert.deepEqual(datesOf(push({ "Sooloos.NullDate Sooloos.Broker.Api.AlbumLite::ReleaseDate": nd(2014, 10, 27) }), known),
+    { originalRelease: "1973-03-28", releaseDate: "2014-10-27", released: "1973-03-28" }, "THE one: the remaster's date took the album's");
+  assert.deepEqual(datesOf(push({ "Sooloos.NullDate Sooloos.Broker.Api.AlbumLite::OriginalReleaseDate": nd(1972, 0, 0) }), known),
+    { originalRelease: "1972", releaseDate: "1973-03-28", released: "1972" }, "a corrected original");
+  assert.deepEqual(datesOf(push({}), known), known, "an update of other fields: the dates as known");
+  assert.deepEqual(datesOf(push({}), null), { originalRelease: null, releaseDate: null, released: null });
 });

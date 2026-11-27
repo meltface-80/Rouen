@@ -22,10 +22,13 @@ const OWNER = Buffer.from("cafebabe", "hex");
 const OTHER = Buffer.from("deadbeef", "hex");
 const BROKER_OID = 9n;
 
-/** A ProfileData<bool> body: another profile's opposite value, then the owner's. @param {boolean} fav */
-function profileData(fav) {
+/**
+ * A ProfileData<bool> body: another profile's value, then the owner's. The other's is the opposite of the owner's
+ * unless it was set (a heart sent for it, 2.0.7-t4). @param {boolean} fav @param {boolean} [other]
+ */
+function profileData(fav, other) {
   const w = new BinaryWriter().flexInt(2);
-  w.flexInt(OTHER.length).bytes(OTHER).bytes(Buffer.from([fav ? 0 : 1]));
+  w.flexInt(OTHER.length).bytes(OTHER).bytes(Buffer.from([(other === undefined ? !fav : other) ? 1 : 0]));
   w.flexInt(OWNER.length).bytes(OWNER).bytes(Buffer.from([fav ? 1 : 0]));
   return w.toBuffer();
 }
@@ -80,7 +83,8 @@ function handleHeart(c) {
     const changed = [];
     for (const id of ids) {
       const i = c.albums.findIndex((_a, k) => c.albumIdOf(k) === id);
-      if (i >= 0 && !c.faults.heartsIgnored) { c.albums[i].favorite = state === 1; changed.push(i); }
+      // Each profile's own (2.0.7-t4): a heart for the other profile leaves the owner's as it was.
+      if (i >= 0 && !c.faults.heartsIgnored) { c.albums[i][profile.equals(OTHER) ? "favOther" : "favorite"] = state === 1; changed.push(i); }
     }
     // albumHeartPushed: the album sent again to each connection holding it, as a change made elsewhere
     // is — after the answer, or ("first") before it.

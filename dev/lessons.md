@@ -106,7 +106,11 @@ in a gate (`dev/quality.md`), not here.
   had come in). An earlier look had called "the bar grows" refuted; measuring `--foot-h` itself in the failing runs
   showed otherwise. **v1.9.72-t21**: a sheet has the bar measured as it opens. A size that something else is placed
   by is measured where it is used, not only when an observer says so; and a test of it grows the thing and uses it
-  in one task, with no frame between (`test/dom/shelf-sheet-foot.test.js`).
+  in one task, with no frame between (`test/dom/shelf-sheet-foot.test.js`). **An IntersectionObserver too (2.0.7-t6):**
+  the Artists screen asked for photos only when one reported, and `artists-screen.test.js` timed out once on CI
+  waiting for the asking; the tiles on screen are now measured as it opens, and a test opens it with an observer that
+  never reports (`test/dom/artists-photos-no-frame.test.js`). It could not be made to fail by load (96 runs): a test
+  that takes the frame away is how such a race is shown.
 - **No partial migrations.** When renaming a constant or moving it to settings, search the entire file with grep before committing to ensure zero stale references remain.
 
 ## When a bug is found

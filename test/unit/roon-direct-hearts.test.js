@@ -8,46 +8,9 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { createStage1 } = require("../../lib/roon-direct/stage1");
 const { createMarks } = require("../../lib/roon-direct/marks");
-const { createLink } = require("../../lib/roon-direct/link");
-const { readAlbumsOn } = require("../../lib/roon-direct/albums");
-const { startFakeCore } = require("../lib/fake-roon-core");
-const { dotnetGuidBytes } = require("../../lib/roon-direct/brokerid");
-const { CORE_ID, LIBRARY, assertTidy } = require("../lib/roon-direct-fixtures");
-
-const keyOf = (title, artist) => (title ? `${title.toLowerCase()}||${artist.toLowerCase()}` : null);
-const until = async (fn) => { for (let i = 0; i < 250 && !fn(); i++) await new Promise((r) => { setTimeout(r, 20); }); return fn(); };
-/** Releases and disposals are sent without waiting: tidy once the fake has read them all. */
-async function tidy(rec) {
-  await until(() => rec.released.length >= rec.retained.length && rec.disposed.length >= rec.opened.length);
-  assertTidy(rec);
-}
-const BLUE = Array.from({ length: 10 }, (_, i) => `Blue ${i + 1}`);
-
-/** @param {(n: number, core: any, s1: any) => Promise<void>} [hook]  run as each read ends, before stage 1 takes it */
-async function rig(t, faults, hook, edit) {
-  // And one more by the same artist whose title holds "Blue": only the album's id tells its tracks apart.
-  const albums = LIBRARY.map((a) => Object.assign({}, a)).concat([{ title: "Blue (Deluxe)", artist: "Joni Mitchell", source: "local", tracks: 3 }]);
-  if (edit) edit(albums);
-  // As the owner's server does (v1.9.28): each object sent once a connection.
-  const f = Object.assign({ sentOnce: true }, faults);
-  const core = await startFakeCore({ brokerId: dotnetGuidBytes(CORE_ID), albums, faults: f });
-  let s1 = null;
-  let reads = 0;
-  const link = createLink({ core: () => ({ host: "127.0.0.1", coreId: CORE_ID }), port: core.port, timeoutMs: 1500,
-    settleMs: 800, retryFirstMs: 100, onUp: () => s1.linkUp() });
-  s1 = createStage1({
-    settings: { load: () => (faults && faults.saved) || null, save() {} }, cache: { read: () => null, write() {}, remove() {} },
-    core: () => ({ host: "127.0.0.1", coreId: CORE_ID, coreVersion: "2.0" }), rouenVersion: "1.9.27",
-    records: () => [], keyOf, link, minGapMs: 0,
-    read: async (s, o) => { const r = await readAlbumsOn(s, o); reads++; if (hook) await hook(reads, core, s1); return r; },
-  });
-  t.after(async () => { s1.turnOff(); await core.close(); });
-  s1.turnOn();
-  assert.ok(await until(() => reads === 1 && s1.albums()), "the library was never read");
-  return { core, s1, albums, faults: f, marks: s1.marks, reads: () => reads };
-}
+const { until, tidy, BLUE, rig } = require("../lib/roon-direct-hearts-rig");
+const { LIBRARY } = require("../lib/roon-direct-fixtures");
 
 test("THE one: an album heart reaches the Core, for Rouen's profile, by the album's stable id", async (t) => {
   const w = await rig(t);
@@ -218,19 +181,6 @@ test("THE one for v1.9.63: hearts are on once the library is read, whatever an e
   assert.equal(w.s1.status().hearts.favourites, 1, "the favourites the read found");
   assert.equal("enabled" in w.s1.status().hearts, false, "a switch's state is still reported");
   assert.equal("setHearts" in w.s1, false, "the switch is still there to turn hearts off");
-});
-
-test("THE one for the owner's §8.4: several profiles — hearts wait for one to be chosen, and are that profile's", async (t) => {
-  const w = await rig(t, { twoProfiles: true });
-  assert.deepEqual(w.s1.status().hearts.profiles, [{ id: "cafebabe", name: "Owner" }, { id: "deadbeef", name: "Guest" }]);
-  assert.match(w.marks.albumState("Blue", "Joni Mitchell").why, /^Choose whose favourites/);
-  assert.equal("error" in w.s1.setProfile("00ff00"), true, "a profile the server does not have");
-  w.s1.setProfile("deadbeef");
-  assert.ok(await until(() => w.reads() === 2), "the list was not read again for the profile");
-  // The fake gives Guest the opposite of the owner's: Blue (not the owner's) is Guest's.
-  assert.equal(w.marks.albumState("Blue", "Joni Mitchell").favorite, true, "the read still gave the first profile's hearts");
-  assert.equal((await w.marks.setAlbum("Blue", "Joni Mitchell", false)).ok, true);
-  assert.equal(w.core.rec.hearts.at(-1).profile, "deadbeef", "the heart went to the first profile, not the one chosen");
 });
 
 // v1.9.28: the server sends each track once a connection; a second heart on the

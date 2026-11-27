@@ -111,3 +111,38 @@ test("v1.9.72-t22: in a browser, nothing changes: a download link, no app", { sk
     assert.ok(r.row.includes("A:Download"), JSON.stringify(r.row));
   });
 });
+
+// 2.0.6-t9: Rouen Lite's bridge saved files alone, Copy image out (2.0.6-t6's Copy, with a FileProvider and the storage
+// permission, was blocked by Google Play Protect). 2.0.6-t11 (the owner, 2026-11-24: "I said it was failing to copy and
+// to fix it, not remove it"): Copy image back through the bridge's cardCopy, beside Download through its fileSave. A
+// bridge without cardCopy (2.0.6-t9's) still gives Download alone.
+const LITE = (copy) => `
+window.__cardCalls = [];
+window.RouenLite = { fileSave: function (data, name) { window.__cardCalls.push(["file", data, name]); return '{"ok":true}'; }${copy ? `,
+  cardCopy: function (png, name) { window.__cardCalls.push(["copy", png, name]); return '{"ok":true}'; }` : ""} };`;
+
+test("2.0.6-t11: in Rouen Lite, Copy image through Lite's cardCopy, and Download through its file save", { skip: !harness.available }, async (t) => {
+  const r = harness.renderPage({ name: "share-card-lite", windowSize: "390x844", stub: stub(LITE(true)), driver: DRIVER });
+  harness.assertNoPageError(assert, r);
+  await t.test("THE one: Copy image is back, beside Download, both buttons, no download link", () => {
+    assert.deepEqual(r.row, ["BUTTON:Copy image", "BUTTON:Download"]);
+    assert.equal(r.links, 0);
+  });
+  await t.test("each hands Lite the card's PNG and its name, and says how it went", () => {
+    assert.deepEqual(r.pressed, [true, true]);
+    assert.deepEqual(r.calls.map((c) => c[0]), ["copy", "file"]);
+    for (const c of r.calls) { assert.equal(c[1], "iVBORw0K"); assert.equal(c[2], "Bruce_Springsteen-Western_Stars.png"); }
+    assert.ok(r.afterCopy.includes("BUTTON:Copied!"), JSON.stringify(r.afterCopy));
+    assert.ok(r.afterSave.includes("BUTTON:Saved to Downloads/Rouen"), JSON.stringify(r.afterSave));
+    assert.equal(r.err, "");
+  });
+});
+
+test("2.0.6-t9: a Rouen Lite without cardCopy gives Download alone", { skip: !harness.available }, async (t) => {
+  const r = harness.renderPage({ name: "share-card-lite-old", windowSize: "390x844", stub: stub(LITE(false)), driver: DRIVER });
+  harness.assertNoPageError(assert, r);
+  await t.test("Download alone, through its file save", () => {
+    assert.deepEqual(r.row, ["BUTTON:Download"]);
+    assert.deepEqual(r.calls.map((c) => c[0]), ["file"]);
+  });
+});

@@ -100,7 +100,7 @@ test("each letter is one unbroken run of the shelf, in libraryView's own artist 
              sortTitle: "album " + i, cArtist: id.c, cFirst: id.first, cCredits: id.names, srcKeys: [] };
   });
   const L = loadIndexFunctions(
-    ["libraryView", "artistSortName", "libraryPrefix", "libraryPrefixMax", "albumMatchesPrefix", "normalize", "albumPlayKey",
+    ["libraryView", "artistSortName", "libraryPrefix", "libraryPrefixMax", "albumMatchesPrefix", "normalize",
      "albumYearOf", "albumYearKey", "albumDateOf", "albumAddedOf", "seededRank", "libFacetDefs", "facetMatch", "albumReleaseOf",
      "albumGenresOf", "albumFileFactsOf", "albumFileFacts", "libAddedWindows"],
     {
@@ -112,7 +112,8 @@ test("each letter is one unbroken run of the shelf, in libraryView's own artist 
       libraryViewCache: new Map(), LIBRARY_VIEW_CACHE_MAX: 8,
       LIB_SORTS: new Set(["album", "artist", "label", "year", "added", "plays", "lastplayed", "random"]),
       albumSource: () => null, resolveAlbumLabelName: () => null,
-      getPlayedTitlesSince: () => new Set(), playedTitleSet: () => new Set(),
+      listenKey: (al) => String(al.title || "").toLowerCase().trim(),   // keyed by title here (2.0.6-t20)
+      playedAlbumKeysSince: () => new Set(), playedAlbumKeySet: () => new Set(),
       playStats: () => ({ count: new Map(), last: new Map() }),
     });
   // The route's own lookups (see /api/shelf/albums).

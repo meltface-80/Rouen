@@ -93,7 +93,7 @@ test("the route: a zone_id or a 400, and the answer as read", async () => {
   const routes = {};
   const asked = [];
   mountRoonDirect({ get: (p, h) => { routes[p] = h; }, post() {} }, /** @type {any} */ ({ status: () => ({}), unmatched: () => [],
-    turnOn() {}, turnOff() {}, setProfile: () => ({}), zoneSettings: { read: (id) => (asked.push(id), { native: true, found: false, zone_id: id }) } }));
+    turnOn() {}, turnOff() {}, zoneSettings: { read: (id) => (asked.push(id), { native: true, found: false, zone_id: id }) } }));
   const get = async (query) => { const res = { code: 200, body: null, set() {}, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
     await routes["/api/roon/zone-settings"]({ query }, res); return [res.code, res.body]; };
   assert.deepEqual(await get({ zone_id: "16aa01" }), [200, { native: true, found: false, zone_id: "16aa01" }]);

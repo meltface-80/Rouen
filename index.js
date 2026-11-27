@@ -49,8 +49,13 @@ const { createStage1, fileCache } = require("./lib/roon-direct/stage1");
 const { createSettingsStore } = require("./lib/settings");
 const { createLogin } = require("./lib/login");
 const { createLink } = require("./lib/roon-direct/link");
+const { emergencyOff } = require("./lib/roon-direct/always-on");
+const { createImageLru } = require("./lib/image-lru");
 const { showLibrary } = require("./lib/roon-direct/library");
-const { createAlbumSearch } = require("./lib/provider/public/album-search");
+const { scoreAlbum } = require("./lib/album-score");
+const { storeReleased } = require("./lib/roon-direct/album-dates");
+const { decodeEntities } = require("./lib/html-entities");
+const { createAlbumSearch, enterAlbum } = require("./lib/provider/public/album-search");
 const { createAlbumOpen } = require("./lib/provider/public/album-open");
 const { createPlaylistOpen, PLAYLIST_ITEMS } = require("./lib/provider/public/playlist-open");
 const { createBrowse } = require("./lib/provider/public/browse");
@@ -65,6 +70,7 @@ const { mountQobuzOAuth } = require("./lib/routes/qobuz-oauth");
 const { mountShortcuts } = require("./lib/routes/shortcuts");
 const { mountTransferZone } = require("./lib/routes/transfer-zone");
 const { createExactIndex } = require("./lib/library-exact");
+const { createLaterStore } = require("./lib/listen-later/store"), { createLaterOwners } = require("./lib/listen-later/owners");
 const { mountLastfmSimilar } = require("./lib/routes/lastfm-similar");
 const { mountSmartRoon } = require("./lib/routes/smart-roon");
 const { mountSmartMake } = require("./lib/routes/smart-make");
@@ -105,10 +111,14 @@ const { parsePitchforkReviewHtml: parsePitchforkPage } = require("./lib/pitchfor
 const similar    = require("./lib/similar");
 const newRel     = require("./lib/newreleases");
 const qobuzDeep  = require("./lib/qobuz-deeplink");
-// HQPlayer control (v1.8.74), ported from hqpweb by statelycurmudgeon (MIT — lib/hqp/LICENSE); since v1.9.19 the
-// HQPWeb plugin (dev/design/plugins.md), all under lib/hqp/, run only while it is installed (Settings → Plugins).
-const { createPluginHost } = require("./lib/plugins");
-const { hqpPlugin } = require("./lib/hqp/plugin");
+// The plugins (dev/design/plugins.md): HQPWeb (lib/hqp/, ported from hqpweb by statelycurmudgeon, MIT), run only while
+// installed (Settings → Plugins); registered in lib/plugins-mount.js.
+const { mountPlugins } = require("./lib/plugins-mount");
+const { mountQueue } = require("./lib/routes/queue");
+const { mountOutputStandby } = require("./lib/routes/output-standby");
+const { mountLabelAlbums } = require("./lib/routes/label-albums");
+const { identity: rouenIdentity } = require("./lib/lite");
+const { openDatabaseModule } = require("./lib/sqlite-compat");
 // Title-only album matching, for the albums Roon supplies no artist for. Pure —
 // see lib/albumkeys.js. Required up here rather than beside the waveform code
 // because albumSource reads it, and that runs from every list endpoint.
@@ -119,8 +129,17 @@ const AK = require("./lib/albumkeys");
 const QOA = require("./lib/qobuz-oauth");
 const { radioDecision, radioResumeDecision, radioQueueFloor,
         radioToTurnOff } = require("./lib/radio");
-const { playCounted, historyEntry, pushHistory, recentHistory,
+const { historyEntry, pushHistory, recentHistory,
         sendOrderFor, MULTI_MAX } = require("./lib/queue-history");
+// What counts as a play (dev/design/listening.md, 2.0.6-t20): the store and readers, the album a play belongs to,
+// album runs, and the zone pushes recorded as plays.
+const { createListening } = require("./lib/listening/listening");
+const { createProfiles, asHousehold } = require("./lib/profiles");
+const picksTables = require("./lib/smart-picks/tables");
+const { buildEach, createDaily } = require("./lib/smart-picks/daily");
+const { createPickJson } = require("./lib/smart-picks/json");
+const { createPickAlbums } = require("./lib/smart-picks/resolve");
+const { plainCredit } = require("./lib/roon-direct/find");
 const pkg = require("./package.json");
 // Parse "1.6.31" → display "MusicD Remote v1.6 (Build 31)"
 const [_vmaj, _vmin, _vpatch] = (pkg.version || "0.0.0").split(".");
@@ -329,13 +348,15 @@ try {
   }
 } catch (e) { /* unreadable legacy config — start unpaired; user authorises once */ }
 
+// Rouen, or Rouen Lite (lib/lite.js, dev/design/rouen-lite.md §2.1): Lite is an extension of its own in Roon.
+const ROUEN_IDENTITY = rouenIdentity();
 const roon = new RoonApi({
-  extension_id:        "com.musicd.roon.random-albums",
+  extension_id:        ROUEN_IDENTITY.extension_id,
   // The renames ("MusicD Remote", then "Rouen" in v1.8.74) are display-only:
   // extension_id stays unchanged on purpose — changing it would make Roon
   // treat this as a brand new extension and force every user to re-authorize
   // it. Roon keys the authorisation on extension_id, never on display_name.
-  display_name:        "Rouen v" + DISPLAY_SHORTVER,
+  display_name:        ROUEN_IDENTITY.name + " v" + DISPLAY_SHORTVER,
   display_version:     "Build " + DISPLAY_BUILD,
   publisher:           "MusicD",
   email:               "hello@musicd.app",
@@ -404,8 +425,8 @@ const roon = new RoonApi({
           // Same reasoning for what it played: a zone_id that comes back is a
           // different queue, and presenting the old zone's tracks under it
           // would offer to play next from a session that is over.
+          scrobbleZoneGone(zid);   // what it was playing is over: counted as far as it was heard
           zoneHistory.delete(zid);
-          scrobbleState.delete(zid);
         });
       }
     });
@@ -460,8 +481,8 @@ const roon = new RoonApi({
     // What each zone played goes with the connection. It describes a session
     // against a queue we can no longer see, and the elapsed time of whatever
     // was playing when the Core went is lost with it either way.
+    scrobbleReset();   // what was playing is over: counted as far as it was heard
     zoneHistory.clear();
-    scrobbleState.clear();
     stopIndexMaintenance();
     // The album index is deliberately KEPT across an unpair: it's plain
     // offset/title data (no session-scoped item_keys), so it stays usable for
@@ -922,34 +943,17 @@ async function pickRandomAlbums(count, filter, seed) {
 }
 
 // ---------------------------------------------------------------------------
-// Set of album titles (lowercased, trimmed) played since cutoffMs. Empty Set
-// if the plays DB is unavailable or the query fails — callers degrade to
-// treating everything as unplayed / picking pure-random.
-function getPlayedTitlesSince(cutoffMs) {
-  if (!labelsDb) return new Set();
-  try {
-    return new Set(
-      labelsDb.prepare("SELECT DISTINCT lower(trim(album)) as a FROM plays WHERE ts > ? AND album != ''")
-              .all(cutoffMs).map(r => r.a)
-    );
-  } catch (e) {
-    return new Set(); // DB unavailable — degrade gracefully
-  }
+// The albums played since cutoffMs (a track of them played, or the whole album), by listenKey: one album each, never
+// every album of a title (2.0.6-t20, dev/design/listening.md §5). Empty if the plays DB is unavailable — callers
+// degrade to treating everything as unplayed / picking pure-random.
+function playedAlbumKeysSince(cutoffMs, who) {   // who: a profile's (profiles.viewer()), or everyone's when none
+  return listening.playedKeysSince(cutoffMs, who);
 }
 
-// When the extension recorded its first play (ms), or null. The plays table is
-// pruned at playsRetentionDays() (400), wider than the longest window the
-// unplayed route accepts (12 months), so the oldest surviving row is a sound
-// answer for every window it is compared against.
-function firstPlayTs() {
-  if (!labelsDb) return null;
-  try {
-    const r = labelsDb.prepare("SELECT MIN(ts) AS ts FROM plays").get();
-    return r && r.ts ? r.ts : null;
-  } catch (e) {
-    return null;   // DB unavailable — reads as "no history yet"
-  }
-}
+// When the device's profile's first play was kept (ms), or null ("no history yet", the database unavailable too). The
+// plays table is pruned at playsRetentionDays() (400), wider than the longest window the unplayed route accepts (12
+// months), so the oldest surviving row is a sound answer for every window it is compared against.
+function firstPlayTs() { return listening.firstPlay(profiles.viewer()); }
 
 // The random album radio's pick (v1.9.3 — lib/radio-memory.js). Never an
 // album the RADIO played in the last six months, the user's rule; among the
@@ -992,9 +996,8 @@ function radioAlbumKey(al) {
 
 async function pickSmartAlbum() {
   if (!albumIndex.albums.length) return (await pickRandomAlbums(1)).albums[0] || null;
-  const recent = labelsDb ? getPlayedTitlesSince(Date.now() - 30 * 24 * 60 * 60 * 1000) : new Set();
-  const al = radioMemory().pick(albumIndex.albums, radioAlbumKey,
-                               (a) => recent.has((a.title || "").toLowerCase().trim()));
+  const recent = labelsDb ? playedAlbumKeysSince(Date.now() - 30 * 24 * 60 * 60 * 1000) : new Set();
+  const al = radioMemory().pick(albumIndex.albums, radioAlbumKey, (a) => recent.has(listenKey(a)));
   return al ? { offset: al.offset, title: al.title || "", subtitle: al.subtitle || "",
                 image_key: al.image_key || null } : null;
 }
@@ -1162,23 +1165,12 @@ async function loadAlbumSession(sessionKey, offset, filter, expect, zoneId) {
     }
   }
 
-  // 3) Drill into the album
-  const drill = await browse({
-    hierarchy,
-    item_key:  albumItem.item_key,
-    multi_session_key: sessionKey
-  });
-  if (drill.action !== "list") {
-    throw roonBrowseError(drill, "this album");
-  }
-
-  // 4) Load contents (tracks + action_list).  Explicit count for big albums.
-  const inside = await load({
-    hierarchy,
-    offset: 0,
-    count: 500,
-    multi_session_key: sessionKey
-  });
+  // 3–4) Drill into the album and load its contents (tracks + action_list, up to 500), entering the one-album level an
+  //      album in Roon's search opens (lib/provider/public/album-search.js enterAlbum, 2.0.6-t19).
+  const entered = await enterAlbum({ browse, load }, hierarchy, sessionKey, albumItem);
+  if (entered.drill.action !== "list") throw roonBrowseError(entered.drill, "this album");
+  const inside = entered.inside;
+  albumItem = entered.albumItem;
 
   const items = inside.items || [];
   // What Roon said the level HOLDS, versus what it actually handed over. The
@@ -1459,8 +1451,9 @@ let qobuzLastReq = 0;
 // Three tables: label_names, label_mbids, label_logos.
 // In-memory Maps mirror the DB for O(1) lookups; every write updates both.
 // ---------------------------------------------------------------------------
-let Database;
-try { Database = require("better-sqlite3"); } catch (e) { Database = null; }
+// better-sqlite3 where it is built (Docker, Windows), Node's own SQLite behind lib/sqlite-compat.js where it isn't (Rouen
+// Lite on Android, dev/design/rouen-lite.md §3.1), else none (the cache in memory, as openLabelsDb says).
+const Database = openDatabaseModule();
 
 const LABELS_DB_DIR  = path.join(__dirname, "data", "cache");
 const LABELS_DB_FILE = path.join(LABELS_DB_DIR, "labels.db");
@@ -1499,11 +1492,14 @@ const choices = createChoices({ getSettings: loadPersistedSettings, saveSettings
   log: (line) => { console.log("[choices] " + line); } });
 
 // Roon direct, stage 1 (dev/design/roon-native.md §10): each album's source
-// from the Core itself, once turned on in Settings → Roon (lib/roon-direct/stage1.js).
+// from the Core itself, always on since 2.0.6-t21 (§11; lib/roon-direct/stage1.js).
 // v1.9.21 (dev/design/native-remote.md): over one connection kept open
 // (link.js), and the library the screens read is the Core's (publishLibrary).
+// Native mode is always on (roon-native.md §11, 2.0.6-t21); the emergency off is read once, at start.
+const nativeEmergencyOff = emergencyOff({ env: process.env, settings: loadPersistedSettings() });
 const roonDirectCore = () => (core ? { host: roonCoreHost(), coreId: core.core_id || null, coreVersion: core.display_version || null } : null);
 const roonLink = createLink({ core: roonDirectCore, onUp: () => { roonDirectLinkUp(); }, onDown: (why, planned) => { roonDirectLinkDown(why, planned); },
+  onBroken: (why) => { roonDirectLinkBroken(why); },   // the path closed or broken: suspended (roon-native.md §11.2)
   log: (line) => { console.log("[roon-direct] link " + line); } });
 const roonDirect = createStage1({
   settings: { load: () => loadPersistedSettings().roonDirect, save: (v) => { savePersistedSettings({ roonDirect: v }); } },
@@ -1515,7 +1511,8 @@ const roonDirect = createStage1({
   onFacts: scheduleLibraryMetaBump,   // a heart, or a format or genre moved: the Shelf asks again (shelf-focus.md §2)
   log: (line) => { console.log("[roon-direct] " + line); },
   chosen: () => choices.native(),
-  inLibrary: libraryOffsetOf, onLaterChange: bumpLaterVersion,
+  emergency: () => nativeEmergencyOff,   // ROUEN_NATIVE=off, or Lite's settings.json "native": "off" (§11)
+  inLibrary: libraryOffsetOf, onLaterChange: bumpLaterVersion, requestProfile: () => roonOfRequest(),   // the device's linked Roon profile (2.0.7-t4)
   release: (title, artist) => { const al = { title, subtitle: artist }; const r = albumReleaseOf(al); return { label: resolveAlbumLabelName(al), catno: r ? r.catno : null, type: r ? r.type : null, types: r ? r.types : [], src: r ? r.src : null }; },   // the edit-info probe's (v1.9.67-t3)
   roonRelease: keepRoonReleases,   // a walk of Roon's edit info (v1.9.67-t4)
   // The official zone a smart playlist plays on (§12.3), by its id or an output's; all of them, for the zones probe (§14.1).
@@ -1527,6 +1524,7 @@ choices.nativeWith({ optIn: () => { roonDirect.optIn(); }, optOut: () => { roonD
 function roonDirectPaired() { roonDirect.paired(); }
 function roonDirectLinkUp() { roonDirect.linkUp(); }
 function roonDirectLinkDown(why, planned) { roonDirect.linkDown(why, planned); }
+function roonDirectLinkBroken(why) { roonDirect.linkBroken(why); }
 
 // Load persisted API keys (set via web UI settings).
 //
@@ -2027,7 +2025,24 @@ const releaseLookup = createReleaseLookup({
   remove: () => { if (labelsDb) { try { labelsDb.prepare("DELETE FROM release_lookup").run(); } catch (e) { if (DEBUG) console.error("[release] lookup clear:", e.message); } } },
 });
 let stmtInsertName, stmtInsertMbid, stmtInsertLogo, stmtInsertMerge, stmtDeleteMerge, stmtInsertYear;
-let stmtInsertPlay, stmtCompletePlay;
+// Profiles (lib/profiles/, 2.0.7-t2, dev/design/profiles.md): who is listening, on each device and on each zone.
+const laterOwners = createLaterOwners({ db: () => labelsDb });   // whose each album on Listen later is (2.0.7-t5)
+const profiles = createProfiles({ db: () => labelsDb, accountName: () => String((loadPersistedSettings().login || {}).user || ""),
+  zone: (id) => zones[id] || Object.values(zones).find((z) => z.display_name === id || (z.outputs || []).some((o) => o.output_id === id)) || null,
+  changed: () => playsChanged(), log: (l) => console.error(l), movers: [picksTables.moveProfile, (db, from, to) => laterOwners.moveProfile(from, to)], removed: (from, to) => smartTuneMoved(from, to), roonProfiles: () => roonDirect.roonProfiles() });
+function roonOfRequest() { return profiles.roonOfRequest(); }
+// What counts as a play (lib/listening/, 2.0.6-t20): the zone pushes recorded as plays, the album each belongs to,
+// albums played, and every reader that counts plays.
+const listening = createListening({
+  db: () => labelsDb, albums: libraryAlbumsNow, version: libraryVersionNow,
+  albumKey, canonText, canonArtist, splitCredit: splitCreditIntoArtists, plainCredit, trackKeys: trackTitleKeys,
+  // Opening the album as the album view does (loadAlbumSession) reads its track list.
+  openAlbum: (al) => openAlbumByOffset(al.offset, null, null, null, { title: al.title, subtitle: al.subtitle }),
+  state: scrobbleState, history: zoneHistory, historyEntry, pushHistory,
+  zoneName: (zid) => (zones[zid] && zones[zid].display_name) || zid,
+  changed: () => playsChanged(), albumPlayed: (title, p) => listenLaterNoticePlay(title, p), whose: profiles.whose, playing: profiles.playing,
+  log: (msg) => console.log(msg), debug: (msg) => { if (DEBUG) console.log(msg); },
+});
 // Smart Picks. Declared here with the rest so they exist (as undefined) before
 // openLabelsDb runs — a bare assignment below a later `let` is the startup
 // ReferenceError this file has been bitten by before.
@@ -2211,25 +2226,6 @@ function openLabelsDb() {
         ts           INTEGER NOT NULL,
         PRIMARY KEY (day, rank)
       );
-      -- Smart Picks: the six albums surfaced on a given day. Stored rather than
-      -- recomputed so the set is stable for everyone looking at it, and so a
-      -- restart does not hand somebody a different day's picks.
-      CREATE TABLE IF NOT EXISTS smart_picks (
-        day      TEXT NOT NULL,
-        kind     TEXT NOT NULL,
-        rank     INTEGER NOT NULL,
-        mbid     TEXT,
-        artist   TEXT NOT NULL,
-        canon    TEXT NOT NULL,
-        album    TEXT,
-        album_id TEXT,
-        service  TEXT,
-        image    TEXT,
-        reason   TEXT,
-        genre    TEXT,
-        ts       INTEGER NOT NULL,
-        PRIMARY KEY (day, kind, rank)
-      );
       -- Listen later (v1.8.67): albums put aside to play another time. Keyed
       -- by album IDENTITY (albumKey), never by offset — offsets reshuffle on
       -- every library change, and this list has to survive a rescan. An entry
@@ -2246,20 +2242,6 @@ function openLabelsDb() {
         image    TEXT,
         source   TEXT NOT NULL,
         ts       INTEGER NOT NULL
-      );
-      -- Artists already shown, so the set turns over instead of repeating.
-      CREATE TABLE IF NOT EXISTS smart_pick_seen (
-        canon TEXT PRIMARY KEY,
-        ts    INTEGER NOT NULL
-      );
-      -- "Not for me" — an EXPLICIT tap only, and permanent. Silence is never
-      -- recorded here: the premise of the feature is albums the user would not
-      -- otherwise reach for, so treating no-response as rejection would empty
-      -- the pool within a week.
-      CREATE TABLE IF NOT EXISTS smart_pick_blocks (
-        canon TEXT PRIMARY KEY,
-        name  TEXT,
-        ts    INTEGER NOT NULL
       );
       -- Cached third-party reads (the sitewide hub chart, per-seed similarity,
       -- per-genre rosters). Persisted so a rebuild on an unchanged library
@@ -2325,6 +2307,12 @@ function openLabelsDb() {
       -- driver. Without this it is a full scan in front of the screen.
       CREATE INDEX IF NOT EXISTS plays_ts ON plays(ts);
     `);
+    // 2.0.6-t20: how long each track was heard, whether that was a play, its album, and the albums played
+    // (lib/listening/store.js); the rows from before marked, so they are read by the rule they were recorded under.
+    listening.migrate(labelsDb);
+    profiles.migrate(labelsDb);   // 2.0.7-t2: the profiles, and the first one
+    picksTables.migrate(labelsDb, profiles.store.first().id);   // Smart Picks' tables, each profile's (2.0.7-t3)
+    laterOwners.migrate(labelsDb);   // whose each album on Listen later is (2.0.7-t5)
     // `src` records WHERE a year came from, so a better source can correct a
     // worse one (see yearSourceRank). Added after the table shipped without
     // it, so it goes on as a migration; existing rows read back as rank 0 and
@@ -2379,8 +2367,6 @@ function openLabelsDb() {
     stmtInsertLogo  = labelsDb.prepare("INSERT OR REPLACE INTO label_logos (group_key, logo_url) VALUES (?, ?)");
     stmtInsertMerge = labelsDb.prepare("INSERT OR REPLACE INTO label_merges (source_key, source_display, target_key, target_display) VALUES (?, ?, ?, ?)");
     stmtDeleteMerge = labelsDb.prepare("DELETE FROM label_merges WHERE source_key = ?");
-    stmtInsertPlay  = labelsDb.prepare("INSERT INTO plays (ts, zone, track, artist, album, image_key, duration) VALUES (?,?,?,?,?,?,?)");
-    stmtCompletePlay = labelsDb.prepare("UPDATE plays SET completed=1 WHERE id=?");
     stmtInsertYear  = labelsDb.prepare("INSERT OR REPLACE INTO album_years (key, year, src, date, date_src) VALUES (?, ?, ?, ?, ?)");
     stmtInsertSeen  = labelsDb.prepare("INSERT OR REPLACE INTO album_seen (key, ts, src) VALUES (?, ?, ?)");
     stmtInsertDateFill = labelsDb.prepare("INSERT OR REPLACE INTO date_fill (key, ts, day, year) VALUES (?, ?, ?, ?)");
@@ -2393,12 +2379,12 @@ function openLabelsDb() {
     stmtInsertReleaseLookup = labelsDb.prepare("INSERT OR REPLACE INTO release_lookup (key, at) VALUES (?, ?)");
     stmtInsertSmartPick = labelsDb.prepare(
       "INSERT OR REPLACE INTO smart_picks " +
-      "(day, kind, rank, mbid, artist, canon, album, album_id, service, image, reason, genre, ts) " +
-      "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
+      "(profile, day, kind, rank, mbid, artist, canon, album, album_id, service, image, reason, genre, ts) " +
+      "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
     stmtInsertSmartSeen  = labelsDb.prepare(
-      "INSERT OR REPLACE INTO smart_pick_seen (canon, ts) VALUES (?, ?)");
+      "INSERT OR REPLACE INTO smart_pick_seen (profile, canon, ts) VALUES (?, ?, ?)");
     stmtInsertSmartBlock = labelsDb.prepare(
-      "INSERT OR REPLACE INTO smart_pick_blocks (canon, name, ts) VALUES (?, ?, ?)");
+      "INSERT OR REPLACE INTO smart_pick_blocks (profile, canon, name, ts) VALUES (?, ?, ?, ?)");
     stmtInsertSmartCache = labelsDb.prepare(
       "INSERT OR REPLACE INTO smart_cache (key, body, ts) VALUES (?, ?, ?)");
     const stmtDeleteName = labelsDb.prepare("DELETE FROM label_names WHERE key = ?");
@@ -2476,6 +2462,7 @@ function openLabelsDb() {
   } catch (e) {
     console.error("[labels] db open failed:", e.message, "— in-memory only");
     labelsDb = null;
+    stmtInsertSeen = null;   // its rows may be unread: a first run would write "undated" over the dates stored (2.0.6-t4)
   }
 }
 
@@ -2585,6 +2572,8 @@ function purgeFanartLogoMisses() {
 // rather than a copy of it injected alongside.
 function yearSourceRank(src) {
   switch (src) {
+    // Roon's own date, from its library read (2.0.6-t15, recently-added.md §5): the owner's source for every date.
+    case "roon":    return 5;
     case "file":    return 4;
     case "release": return 3;
     case "edition": return 2;
@@ -4296,26 +4285,29 @@ let ambiguousAlbumKeys = new Set();
 // The hard part is the FIRST run: an established library would otherwise be
 // stamped with one identical timestamp for every album, which is not a date —
 // it is the moment this feature was installed, wearing a date's clothes. So the
-// first run records nothing at all and leaves those albums undated, and only
-// albums that turn up in a LATER rebuild get a real first-seen. Accuracy
+// first run writes those albums down as known but undated, and only albums
+// that turn up in a LATER rebuild get a real first-seen. Accuracy
 // accrues going forward; it cannot be back-filled, and pretending otherwise
 // would make the sort confidently wrong rather than honestly incomplete.
 function recordFirstSeenAlbums(albums) {
   const baseline = albumSeenCache.size === 0;
   let n = 0;
-  for (const al of albums || albumIndex.albums) {
-    const keys = al.srcKeys || [];
-    if (!keys.length) continue;
-    if (keys.some(k => albumSeenCache.has(k))) continue;
-    if (baseline) continue;   // nothing to compare against — see above
-    if (setAlbumSeen(keys[0], Date.now(), "first-seen")) n++;
-  }
+  const run = () => {
+    for (const al of albums || albumIndex.albums) {
+      const keys = al.srcKeys || [];
+      if (!keys.length || keys.some(k => albumSeenCache.has(k))) continue;
+      // First run (2.0.6-t4): known, "undated" (never shown as a date), so a library without files can date what follows.
+      if (baseline) { setAlbumSeen(keys[0], Date.now(), "undated"); continue; }
+      if (setAlbumSeen(keys[0], Date.now(), "first-seen")) n++;
+    }
+  };
+  // One transaction: unwrapped, a first run is one commit and fsync per album. A failure: the cache still holds them.
+  try { if (labelsDb) labelsDb.transaction(run)(); else run(); } catch (e) { console.error("[seen] write failed:", e.message); }
   if (n) {
     bumpLibraryMeta();
     console.log("[seen] " + n + " albums newly seen in this rebuild");
-  } else if (baseline) {
-    console.log("[seen] first run — existing albums left undated, " +
-                "new ones will be dated from here");
+  } else if (baseline && albumSeenCache.size) {
+    console.log("[seen] first run — existing albums left undated, new ones will be dated from here");
   }
 }
 
@@ -4570,30 +4562,7 @@ function normalize(s) {
     .replace(/\s+/g, " ")
     .trim();
 }
-// Decode HTML entities — named (incl. &copy; &reg; &trade;) and numeric
-// (&#169; / &#xA9;), with or without the trailing semicolon. Unknown entities
-// are left untouched. NOTE: "&copy" reached a share card before because the old
-// stripHtml decoded a handful of entities by hand but not this one.
-const NAMED_ENTITIES = {
-  amp: "&", lt: "<", gt: ">", quot: '"', apos: "'",
-  copy: "\u00A9", reg: "\u00AE", trade: "\u2122",
-  nbsp: " ", hellip: "...", mdash: "\u2014", ndash: "\u2013",
-  lsquo: "\u2018", rsquo: "\u2019", ldquo: "\u201C", rdquo: "\u201D",
-  deg: "\u00B0"
-};
-function safeCodePoint(n) {
-  try { return String.fromCodePoint(n); } catch { return ""; }
-}
-function decodeEntities(input) {
-  if (!input) return "";
-  return String(input)
-    .replace(/&#x([0-9a-f]+);?/gi, (_, h) => safeCodePoint(parseInt(h, 16)))
-    .replace(/&#(\d+);?/g,        (_, d) => safeCodePoint(parseInt(d, 10)))
-    .replace(/&([a-z][a-z0-9]*);?/gi, (m, name) => {
-      const v = NAMED_ENTITIES[name.toLowerCase()];
-      return v !== undefined ? v : m;
-    });
-}
+// Decode HTML entities: lib/html-entities.js (moved out in 2.0.6-t15).
 
 // --- artist guard ----------------------------------------------------------
 // Why this exists: a review/page was matched to the WRONG act because the only
@@ -5739,11 +5708,24 @@ function creditHasArtist(credit, artist) {
 // v1.9.21). `walked`: the official list is new, so its albums are dated.
 function publishLibrary(walked) {
   libraryViewCounts = showLibrary(albumIndex, publicIndex, roonDirect.albums(), indexRecord);
+  if (libraryViewCounts) storeRoonDates();   // Roon's release dates, Rouen's first source (recently-added.md §5)
   rebuildAmbiguousAlbumKeys();   // identities shared by >1 album get no badge
   // New since the last rebuild: of the official list only (the Core's spellings are not new albums).
   if (walked) recordFirstSeenAlbums(publicIndex.albums);
   albumIndex.builtAt  = Date.now();
   rebuildCreditIdentities();     // AFTER builtAt — see the function's comment
+  listeningLibraryChanged();     // plays' albums named against the library as it now is
+}
+
+// Roon's release dates (album-dates.js), its whole word: one transaction, one bump, counted as made. A key it withdraws
+// (no longer dated, or dated two ways) goes, for the other sources' next harvest to fill again.
+function storeRoonDates() {
+  const count = { n: 0 }, drop = (k) => { for (const m of [albumYearCache, albumYearSource, albumDateCache, albumDateSource]) m.delete(k);
+    if (labelsDb) labelsDb.prepare("DELETE FROM album_years WHERE key = ?").run(k); };
+  const run = () => storeReleased(albumIndex.albums, albumYearKey, { count, sourceOf: (k) => albumYearSource.get(k), drop,
+    set: (k, d) => setAlbumYear(k, d, { src: "roon", restate: true, deferBump: true }) });
+  try { if (labelsDb) labelsDb.transaction(run)(); else run(); } catch (e) { console.error("[years] Roon's dates not kept:", e.message); }
+  if (count.n) bumpLibraryMeta();
 }
 
 function sameAlbumList(walked, declared) {
@@ -5885,7 +5867,7 @@ function bgRun(what, fn) {
   // entirely — so the first job queued after any rejection would be silently
   // dropped while everything after it ran normally. Neutralise first, then run.
   _bgTail = _bgTail.catch(() => {}).then(async () => {
-    try { await fn(); }
+    try { await asHousehold(fn); }   // never as the device whose request queued it (lib/profiles/context.js, 2.0.7-t4)
     catch (e) { console.error("[bg] " + what + " failed: " + e.message); }
   });
   return _bgTail;
@@ -6700,94 +6682,7 @@ function stopIndexMaintenance() {
   // (_watchStepping) finishes on its own, and re-arms only if paired again.
 }
 
-// ---- Matching -------------------------------------------------------------
-// Earliest index i where qTokens[k] is a prefix of tokens[i+k] for every k
-// (a consecutive run). Returns that start index, or -1.
-//   tokens=["the","the"], qTokens=["the","t"]  -> 0   (this is the "The The" case)
-function consecutivePrefixStart(tokens, qTokens) {
-  const last = tokens.length - qTokens.length;
-  for (let i = 0; i <= last; i++) {
-    let ok = true;
-    for (let k = 0; k < qTokens.length; k++) {
-      if (!tokens[i + k].startsWith(qTokens[k])) { ok = false; break; }
-    }
-    if (ok) return i;
-  }
-  return -1;
-}
-// Every query token is a prefix of some distinct title token (order-independent),
-// so "dark moon" still finds "Dark Side of the Moon".
-function allTokensPrefixSomewhere(tokens, qTokens) {
-  const used = new Array(tokens.length).fill(false);
-  for (const qt of qTokens) {
-    let found = false;
-    for (let i = 0; i < tokens.length; i++) {
-      if (!used[i] && tokens[i].startsWith(qt)) { used[i] = true; found = true; break; }
-    }
-    if (!found) return false;
-  }
-  return true;
-}
-// Loose typo tolerance: all chars of q appear in order within s.
-function isSubsequence(q, s) {
-  let i = 0;
-  for (let j = 0; j < s.length && i < q.length; j++) {
-    if (s[j] === q[i]) i++;
-  }
-  return i === q.length;
-}
-
-// Higher score = better match. Title hits outrank artist hits of similar
-// quality; exact/prefix outrank substring; fuzzy is a last resort.
-function scoreAlbum(al, q, qTokens, qJoined, singleChar) {
-  let s = 0;
-
-  // ---- Title (primary) ----
-  if (al.nTitle === q) return 1000;
-  if (al.nTitle.startsWith(q)) {
-    s = Math.max(s, 920 - Math.min(al.nTitle.length - q.length, 60));
-  }
-  {
-    const start = consecutivePrefixStart(al.tTitle, qTokens);
-    if (start === 0)                   s = Math.max(s, 900 - Math.min(al.tTitle.length, 40));
-    else if (start > 0 && !singleChar) s = Math.max(s, 820 - start * 4);
-  }
-  if (al.jTitle.startsWith(qJoined)) {
-    s = Math.max(s, 870 - Math.min(al.jTitle.length - qJoined.length, 60));
-  }
-  if (!singleChar) {
-    if (s < 760 && qTokens.length > 1 && allTokensPrefixSomewhere(al.tTitle, qTokens)) {
-      s = Math.max(s, 760);
-    }
-    if (s < 650 && al.nTitle.includes(q)) {
-      s = Math.max(s, 650 - Math.min(al.nTitle.indexOf(q), 40));
-    }
-  }
-
-  // ---- Artist (secondary) ----
-  if (al.nArtist) {
-    if (al.nArtist === q)         s = Math.max(s, 770);
-    if (al.nArtist.startsWith(q)) s = Math.max(s, 740 - Math.min(al.nArtist.length - q.length, 60));
-    {
-      const start = consecutivePrefixStart(al.tArtist, qTokens);
-      if (start === 0)                   s = Math.max(s, 720 - Math.min(al.tArtist.length, 40));
-      else if (start > 0 && !singleChar) s = Math.max(s, 660 - start * 4);
-    }
-    if (al.jArtist.startsWith(qJoined)) s = Math.max(s, 700 - Math.min(al.jArtist.length - qJoined.length, 60));
-    if (!singleChar) {
-      if (s < 600 && qTokens.length > 1 && allTokensPrefixSomewhere(al.tArtist, qTokens)) s = Math.max(s, 600);
-      if (s < 520 && al.nArtist.includes(q)) s = Math.max(s, 520 - Math.min(al.nArtist.indexOf(q), 40));
-    }
-  }
-
-  // ---- Fuzzy fallback (typos), only for longer queries with no real hit ----
-  if (s === 0 && !singleChar && qJoined.length >= 4) {
-    if (isSubsequence(qJoined, al.jTitle))       s = 300;
-    else if (isSubsequence(qJoined, al.jArtist)) s = 260;
-  }
-
-  return s;
-}
+// ---- Matching: scoreAlbum and its helpers are lib/album-score.js ----------
 
 function searchLabels(q) {
   if (!q || !labelsIndex.map.size) return [];
@@ -6877,11 +6772,13 @@ const app = express();
 app.use(express.json({ limit: "1mb" }));
 // Before every route: nothing guarded before the one-time choice; then, with accounts, nothing without a login.
 app.use(choices.guard);
+app.use(profiles.middleware, profiles.playStarts);   // each request as its device's profile; a play started, whose (2.0.7-t2)
 // Every debug answer withheld before any route is mounted (lib/roon-direct/withhold.js, v1.9.70-t9): a probe's walk
 // can reach the server's Roon account and the home's addresses, and a debug route added later is covered too.
 app.use("/api/debug", withholdDebug);
 login.mount(app);
 choices.mount(app);
+profiles.mount(app);
 // API request tracing (DEBUG), the steady pollers left out (lib/http-trace.js, moved out in v2.0.3-t11).
 mountHttpTrace(app, { debug: DEBUG });
 // Gzip responses (app.js is ~230KB, style.css ~120KB — ~70% smaller on the
@@ -6907,7 +6804,7 @@ const listenLater = mountListenLater(app, {
   native: () => roonDirect.listenLater, rows: listenLaterRows, record: listenLaterLibraryRecord, matches: listenLaterMatches,
   add: listenLaterAdd, remove: listenLaterRemove, favourites: smartPickFavourites, withSource, serviceUrl: listenLaterServiceUrl,
   keyOf: albumKey, dbReady: () => !!labelsDb, writable: () => !!labelsDb && !settingsStore.frozen(),
-  cover: (k) => (albumIndex.covers ? albumIndex.covers.get(k) || null : null),
+  cover: (k) => (albumIndex.covers ? albumIndex.covers.get(k) || null : null), owners: laterOwners, viewer: () => { const w = profiles.viewer(); return w ? w.id : null; }, linked: () => { const r = roonDirect.roonProfiles(); return !!r && roonDirect.actingFor() !== r.chosen; },
 });
 // The one test of a Dynamic Playlist made as a Roon smart playlist, by hand (lib/routes/smart-make.js; §12.7).
 mountSmartMake(app, { maker: () => roonDirect.smartMaker, list: loadSmartPlaylists,
@@ -7461,10 +7358,13 @@ function albumDateOf(al) {
 // every identity the album is keyed under, because the file scan and the index
 // may have recorded it under different ones.
 function albumAddedOf(al) {
+  // Roon's own date added, with its library in force (2.0.6-t15, recently-added.md §4); Rouen's evidence otherwise.
+  if (al.roon && al.roon.added) return al.roon.added;
   let best = null;
   for (const k of (al.srcKeys || [])) {
     const hit = albumSeenCache.get(k);
-    if (hit && hit.ts > 0 && (best === null || hit.ts < best)) best = hit.ts;
+    // "undated": there at the first run, its date not known (recordFirstSeenAlbums) — never shown as one.
+    if (hit && hit.ts > 0 && hit.src !== "undated" && (best === null || hit.ts < best)) best = hit.ts;
   }
   return best;
 }
@@ -7514,22 +7414,14 @@ function requestSeed(raw) {
   const n = parseInt(raw, 10);
   return Number.isFinite(n) && n > 0 ? n : null;
 }
-// Album titles played since a cutoff — the plays table records titles only, so
-// this is title-keyed (two artists' "Greatest Hits" collide). Same limitation
-// the Home "not played" row already carries.
-function playedTitleSet(months) {
-  return getPlayedTitlesSince(Date.now() - months * 30 * 24 * 60 * 60 * 1000);
+// The albums played in the last `months` months, by listenKey (playedAlbumKeysSince).
+function playedAlbumKeySet(months) {
+  return playedAlbumKeysSince(Date.now() - months * 30 * 24 * 60 * 60 * 1000, profiles.viewer());
 }
+// Each album's play count (whole albums played) and when it was last played, by listenKey (lib/listening/store.js,
+// 2.0.6-t20). Empty when the DB is unavailable: every album simply scores zero.
 function playStats() {
-  const out = { count: new Map(), last: new Map() };
-  if (!labelsDb) return out;
-  try {
-    for (const r of labelsDb.prepare(
-      "SELECT lower(trim(album)) a, COUNT(*) n, MAX(ts) t FROM plays WHERE album != '' GROUP BY a").all()) {
-      out.count.set(r.a, r.n); out.last.set(r.a, r.t);
-    }
-  } catch (e) { /* DB unavailable — every album simply scores zero */ }
-  return out;
+  return listening.albumStats(profiles.viewer());   // the device's profile's (profiles.md §3)
 }
 
 // The funnel's text, normalised the one way this file normalises anything.
@@ -7595,7 +7487,7 @@ function libraryView(q) {
   // missing, and libraryDateVersion for why no other sort pays for it.
   const readsPlays = sort === "plays" || sort === "lastplayed" || played !== "any";
   const sig = [albumIndex.builtAt, libraryMetaVersion, sort === "year" ? "d" + libraryDateVersion : "",
-               readsPlays ? "n" + playsVersion : "",
+               readsPlays ? "n" + playsVersion + "@" + profiles.viewerKey() : "",
                sort, desc, seed, played, "p=" + prefix]
     .concat(picked.map(x => x.def.id + "=" + x.sel.slice().sort().join(","))).join("|");
   // A free-text param is unbounded, so it must not be allowed to fill a
@@ -7615,14 +7507,17 @@ function libraryView(q) {
     // mean "not in the last N months".
     const months = parseInt(played, 10);
     const seen = (played === "never" || played === "played")
-      ? getPlayedTitlesSince(0)
-      : playedTitleSet(Number.isFinite(months) && months > 0 ? months : 6);
+      ? playedAlbumKeysSince(0, profiles.viewer())
+      : playedAlbumKeySet(Number.isFinite(months) && months > 0 ? months : 6);
     const want = played === "played";
-    list = list.filter(al => seen.has(String(al.title || "").toLowerCase().trim()) === want);
+    list = list.filter(al => seen.has(listenKey(al)) === want);
   }
 
   const stats = (sort === "plays" || sort === "lastplayed") ? playStats() : null;
-  const playKey = albumPlayKey;   // one definition of the plays-table key
+  // An album's identity for its plays, worked out once per album: listenKey normalises, and a comparator calls it
+  // twice per comparison (2.0.6-t20, the review: fifty times slower on a large library).
+  const playKeys = new Map();
+  const playKey = (al) => { let k = playKeys.get(al); if (k === undefined) { k = listenKey(al); playKeys.set(al, k); } return k; };
   const cmp = {
     album:  (a, b) => a.sortTitle.localeCompare(b.sortTitle) || a.nArtist.localeCompare(b.nArtist),
     artist: (a, b) => artistSortName(a).localeCompare(artistSortName(b)) ||
@@ -7801,7 +7696,7 @@ app.get("/api/library/facets", async (req, res) => {
       // list of services, or (before that is read) the extension's.
       sources_derived_why: roonServices ? "roon" : "extension",
       played: libPlayedIds(),
-      hasPlays: !!(labelsDb && getPlayedTitlesSince(0).size)
+      hasPlays: !!(labelsDb && listening.anyPlayed(profiles.viewer()))
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -7867,7 +7762,7 @@ mountShelf(app, {
   ensureIndex: ensureAlbumIndex,
   isIndexBuilt,
   // and the labels, catalogue numbers and kinds it shows (v1.9.67), by their own stamp; the formats (v1.9.68) by
-  stateKey: () => albumIndex.builtAt + "." + albumGenresVersion + "." + shelfYearsStamp() + "." + shelfLabelsStamp() + "." + roonDirect.factsRev(),   // lib/shelf-routes.js's
+  stateKey: () => albumIndex.builtAt + "." + albumGenresVersion + "." + shelfYearsStamp() + "." + shelfLabelsStamp() + "." + roonDirect.factsRev() + "." + roonDirect.actingFor(), heartOf: (a) => roonDirect.heartOf(a), whose: () => String(roonDirect.actingFor()),   // lib/shelf-routes.js's
   libraryRev: () => liveRevisions().library,
   libraryView,
   genresOf: albumGenresOf,
@@ -7906,11 +7801,10 @@ app.get("/api/home/unplayed", async (req, res) => {
       return res.json({ albums: [], total: 0, months, no_history: true,
                         ready_at: first ? first + months * 30 * 24 * 60 * 60 * 1000 : null });
     }
-    const heard = getPlayedTitlesSince(cutoff);
+    const heard = playedAlbumKeysSince(cutoff, profiles.viewer());
     const pool = [];
     for (const al of albumIndex.albums) {
-      const t = (al.title || "").toLowerCase().trim();
-      if (t && heard.has(t)) continue;   // played within the window — skip
+      if (heard.has(listenKey(al))) continue;   // played within the window — skip
       pool.push(al);
     }
     if (!pool.length) return res.json({ albums: [], total: 0, months });
@@ -7968,10 +7862,11 @@ function pruneOldPlays() {
   _historyPrunedAt = Date.now();
   try {
     const cutoff = Date.now() - playsRetentionDays() * 24 * 60 * 60 * 1000;
-    const r = labelsDb.prepare("DELETE FROM plays WHERE ts < ?").run(cutoff);
-    if (r.changes) {
+    const plays = labelsDb.prepare("DELETE FROM plays WHERE ts < ?").run(cutoff).changes;
+    const albums = listening.prune(cutoff);   // the albums played go with them (2.0.6-t20)
+    if (plays || albums) {
       playsVersion++;   // "never played" and the play counts just changed
-      console.log("[history] pruned " + r.changes + " plays older than " +
+      console.log("[history] pruned " + plays + " plays and " + albums + " albums played older than " +
                   playsRetentionDays() + " days");
     }
   } catch (e) {
@@ -8004,15 +7899,8 @@ app.get("/api/home/history", async (req, res) => {
     const count = Math.min(historyMaxTiles(),
       Math.max(1, parseInt(req.query.count, 10) || historyMaxTiles()));
     const cutoff = Date.now() - historyDays() * 24 * 60 * 60 * 1000;
-    let rows = [];
-    try {
-      rows = labelsDb.prepare(
-        "SELECT album, image_key, MAX(ts) AS ts FROM plays " +
-        "WHERE ts >= ? AND album != '' " +
-        "GROUP BY lower(trim(album)) ORDER BY ts DESC LIMIT ?").all(cutoff, count);
-    } catch (e) {
-      return res.json({ albums: [] });   // DB unavailable — an empty row, not an error
-    }
+    // The device's profile's plays and no one's (profiles.md §10.1); empty when the database can't be read.
+    const rows = listening.recentAlbums(cutoff, count, profiles.viewer());
     const lut = libraryLookup();
     const albums = [];
     for (const r of rows) {
@@ -8099,16 +7987,8 @@ app.get("/api/home/album-of-the-day", async (req, res) => {
     const day = aotdDayKey();
     const al = albumOfTheDay();
     if (!al) return res.json({ album: null, day });
-    // Played since today's 00:01? (plays table records the album title.)
-    let played = false;
-    if (labelsDb) {
-      try {
-        const row = labelsDb.prepare(
-          "SELECT 1 FROM plays WHERE lower(trim(album)) = ? AND ts >= ? LIMIT 1"
-        ).get((al.title || "").toLowerCase().trim(), aotdDayStart());
-        played = !!row;
-      } catch (e) { played = false; /* DB unavailable — show it */ }
-    }
+    // Played (the whole album, dev/design/listening.md §5) since today's 00:01? False when the DB is unavailable: show it.
+    const played = !!labelsDb && listening.albumPlayedSince(listenKey(al), aotdDayStart(), profiles.viewer());
     if (played) return res.json({ album: null, played: true, day });
     res.json({ album: withSource({ offset: al.offset, title: al.title || "", subtitle: al.subtitle || "", image_key: al.image_key || null }, al), played: false, day });
   } catch (e) {
@@ -8352,32 +8232,8 @@ app.get("/api/filters/labels", (req, res) => {
 // All albums for one label, ordered. ?label=NAME&order=alpha|random
 // Albums are served from the Qobuz-derived labelsIndex; offsets are positions
 // in the full "albums" hierarchy so open/play work without any filter.
-app.get("/api/label-albums", (req, res) => {
-  if (!labelsEnabled) return res.json({ label: null, albums: [] });
-  const name  = String(req.query.label || "").trim();
-  const order = req.query.order === "random" ? "random" : "alpha";
-  if (!name) return res.status(400).json({ error: "label query parameter required" });
-  const entry = labelsIndex.map.get(labelGroupKey(name));
-  if (!entry) {
-    return res.json({ albums: [], total: 0, label: name, order,
-      scanning: labelsIndex.building });
-  }
-  let albums = entry.albums.slice();
-  if (order === "random") {
-    for (let i = albums.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [albums[i], albums[j]] = [albums[j], albums[i]];
-    }
-  } else {
-    albums.sort((a, b) =>
-      (a.title || "").localeCompare(b.title || "", undefined, { sensitivity: "base" }));
-  }
-  const gk = labelGroupKey(name);
-  // Shallow-copied so the badge isn't written onto the stored label index.
-  res.json({ albums: albums.map(a => withSource(Object.assign({}, a))),
-             total: albums.length, label: name, order,
-             groupKey: gk, logo_url: labelLogoCache.get(gk) || null });
-});
+// GET /api/label-albums (lib/routes/label-albums.js, moved out in 2.0.6-t4): a label's albums.
+mountLabelAlbums(app, { enabled: () => labelsEnabled, index: labelsIndex, groupKey: labelGroupKey, withSource, logos: labelLogoCache });
 
 // Labels scan status — lets the UI poll while the background scan runs.
 app.get("/api/labels-scan-status", (req, res) => {
@@ -8710,15 +8566,8 @@ function roonCoreHost() {
   return (core && core.moo && core.moo.transport && core.moo.transport.host) || ROON_CORE_IP || null;
 }
 
-// In-memory LRU for scaled cover art. Every art fetch used to be a live Roon
-// Core round-trip over the SINGLE multiplexed websocket (images, browse and
-// transport all head-of-line block each other), and the Core rescales the
-// image each time — with ~85 tiles per Home render that was the main source
-// of UI sluggishness. image_key changes when the art changes, so cached bytes
-// never go stale (hence immutable). Map preserves insertion order → delete +
-// re-set on hit gives LRU eviction.
-const IMAGE_CACHE_MAX_BYTES = 64 * 1024 * 1024;   // ~64 MB ≈ 1500+ thumbnails
-const imageCache = new Map();                     // "key@size" → { body, type, bytes }
+// In-memory LRU for scaled cover art (lib/image-lru.js, moved out in 2.0.6-t21).
+const imageLru = createImageLru(64 * 1024 * 1024);   // ~64 MB ≈ 1500+ thumbnails
 
 // Disk-backed thumbnail store on the data volume — survives restarts, unlike
 // the in-memory LRU above. Holds ONE "tile master" per album (500px JPEG, the
@@ -8838,29 +8687,6 @@ async function prewarmAlbumArt() {
     }
   }
 }
-let imageCacheBytes = 0;
-function imageCacheGet(k) {
-  const hit = imageCache.get(k);
-  if (!hit) return null;
-  imageCache.delete(k); imageCache.set(k, hit);   // refresh LRU position
-  return hit;
-}
-function imageCachePut(k, entry) {
-  if (entry.bytes > IMAGE_CACHE_MAX_BYTES / 4) return;   // never let one image dominate
-  // Two concurrent misses for the same key both land here; set() replaces the
-  // entry, so subtract the old bytes first or the accounting drifts upward
-  // forever and eventually evicts the whole cache on every put.
-  const prev = imageCache.get(k);
-  if (prev) imageCacheBytes -= prev.bytes;
-  imageCacheBytes += entry.bytes;
-  imageCache.set(k, entry);
-  while (imageCacheBytes > IMAGE_CACHE_MAX_BYTES && imageCache.size) {
-    const oldest = imageCache.keys().next().value;
-    imageCacheBytes -= imageCache.get(oldest).bytes;
-    imageCache.delete(oldest);
-  }
-}
-
 // Wall/Home tiles ask for 300-500px depending on device DPR (see TILE_IMG_SIZE
 // in app.js). The whole band is served from ONE 500px "tile master" per album
 // — one LRU entry and one disk file instead of a near-identical copy per size.
@@ -8882,7 +8708,7 @@ app.get("/api/image/:image_key", async (req, res) => {
     res.set("Cache-Control", "public, max-age=604800, immutable");
     res.send(entry.body);
   };
-  const cached = imageCacheGet(cacheKey);
+  const cached = imageLru.get(cacheKey);
   if (cached) return serve(cached);
   // Tile band: try the prewarmed disk store next. Works even while unpaired,
   // so wall art survives a Core outage/restart.
@@ -8890,7 +8716,7 @@ app.get("/api/image/:image_key", async (req, res) => {
     try {
       const body = await fs.promises.readFile(artFilePath(key));
       const entry = { body, type: "image/jpeg", bytes: body.length };
-      imageCachePut(cacheKey, entry);
+      imageLru.put(cacheKey, entry);
       return serve(entry);
     } catch (e) { /* not prewarmed (yet) — fall through to the Core */ }
   }
@@ -8904,7 +8730,7 @@ app.get("/api/image/:image_key", async (req, res) => {
       scale: "fit", width: fetchSize, height: fetchSize, format: "image/jpeg"
     });
     const type = content_type || "image/jpeg";
-    imageCachePut(cacheKey, { body, type, bytes: body.length });
+    imageLru.put(cacheKey, { body, type, bytes: body.length });
     if (tileBand && type === "image/jpeg") {
       writeArtFile(key, body).catch(e => { if (DEBUG) console.error("[art] write-through:", e.message); });
     }
@@ -9575,10 +9401,13 @@ function rememberAlbumTracks(albumTitle, albumSubtitle, tracks) {
       }
     });
     write();
+    // ...and by position, for what counts as an album played (lib/listening/, 2.0.6-t20): two tracks of one title are
+    // one row above.
+    listening.keepTrackList(albumTitle, albumSubtitle, tracks.map((t) => String((t && t.title) || "").trim()));
     return n;
   } catch (e) {
-    // Best-effort cache write. A failure here costs a slower import later, and
-    // must never break the album the user actually asked to open.
+    // Best-effort cache write. A failure here costs a slower import later, or an album played that isn't counted
+    // until its tracks are read again, and must never break the album the user actually asked to open.
     if (DEBUG) console.warn("[tracks] remember failed: " + e.message);
     return 0;
   }
@@ -10528,7 +10357,7 @@ const serviceFavourites = createServiceFavourites({
   },
 });
 mountServiceFavourites(app, serviceFavourites, serviceErrorStatus);
-mountLibraryAdd(app, createLibraryAdd({
+const libraryAdd = createLibraryAdd({
   adder: () => roonDirect.adder,
   inLibrary: libraryRecordOf,
   signedIn: (service) => (service === "qobuz" ? qobuzReady() : tidalReady()),
@@ -10538,7 +10367,8 @@ mountLibraryAdd(app, createLibraryAdd({
   wanted: albumKeys, titleForms: favouriteTitleForms, keyOf: albumKey,
   errorStatus: serviceErrorStatus,
   log: (line) => { console.log("[library-add] " + line); },
-}));
+});
+mountLibraryAdd(app, libraryAdd);
 
 // ---------------------------------------------------------------------------
 // Smart Picks — six albums a day by artists NOT in the library.
@@ -10564,11 +10394,12 @@ mountLibraryAdd(app, createLibraryAdd({
 //    user can favourite; Roon imports it and it becomes playable on the next
 //    sync.
 //
-// 3. SEEDS COME FROM THE OBSCURE END. Similarity quality inverts with seed
-//    popularity: Radiohead returns Nirvana, RHCP and Coldplay, while Bark
-//    Psychosis returns Mogwai, Talk Talk, Tortoise, Slint and Labradford. The
-//    sitewide hub chart (one request for the world's 1000 most-listened
-//    artists) is what makes "never seed from the popular end" computable.
+// 3. SEEDS COME FROM WHAT YOU LISTEN TO (2.0.6-t22, smart-picks.md §3).
+//    Whole albums played, shared out by Roon's genres and spread over the
+//    decades as you listen. Similarity quality inverts with seed popularity
+//    (Radiohead returns Nirvana, RHCP and Coldplay; Bark Psychosis returns
+//    Mogwai, Talk Talk and Tortoise), so an artist in the sitewide hub chart
+//    (the world's 1000 most-listened) seeds at a quarter of its score.
 //
 // 4. RANKING IS BY DISTANCE, NOT SIMILARITY. Every recommender sorts by
 //    similarity descending, which is why they all surface the obvious. Here a
@@ -10577,6 +10408,15 @@ mountLibraryAdd(app, createLibraryAdd({
 // ---------------------------------------------------------------------------
 
 const discovery = require("./lib/discovery");
+// Smart Picks' seeds (2.0.6-t22) and its candidates (moved out then): lib/smart-picks/.
+const { whyOf } = require("./lib/smart-picks/seeds");
+const { createTunes, halfLifeOf, describeTune } = require("./lib/smart-picks/tune");
+const { mountSmartPicksActions } = require("./lib/routes/smart-picks-actions");
+const { createSeedInput } = require("./lib/smart-picks/input");
+const { collectSmartCandidates, rankSmartCandidates, diversifySmartCandidates, smartPickExcluded, smartPickReason } = require("./lib/smart-picks/rank");
+const { mountSmartPicksWhy } = require("./lib/routes/smart-picks-why");
+// GET /api/smart-picks/why (smart-picks.md §6): the device's profile's last build that kept its picks, a month at most.
+mountSmartPicksWhy(app, { why: (req) => { const p = profiles.picksOf(req.profile); return p === null ? null : smartCacheGet("why:" + p, smartSimilarTtlMs()); } });
 
 // Vocabulary as functions so the tests read the shipping values rather than
 // asserting against a constant they were handed.
@@ -10590,171 +10430,29 @@ function smartSeenDays()         { return 120; }
 function smartHubTtlMs()         { return 14 * 24 * 60 * 60 * 1000; }
 function smartSimilarTtlMs()     { return 30 * 24 * 60 * 60 * 1000; }
 
-// An album's key in the plays table. Title-only, because that is all Roon's
-// now-playing feed gives us to record — two artists' "Greatest Hits" collide,
-// the same limitation the Home "not played" row and the Library play sort
-// already carry.
-function albumPlayKey(al) { return String(al.title || "").toLowerCase().trim(); }
-
-// The library as artists: canonArtist -> { canon, name, albums, plays }.
-//
-// Derived from album CREDITS, not from the plays table's artist column: that
-// column holds the TRACK artist (Roon's three_line.line2), so on any compilation
-// or classical record it names a performer rather than the act whose library
-// entry this is. Credits are the same source linkableArtistSet uses, so
-// membership tests here and artist links elsewhere can never disagree.
-// Deliberately NOT cached. The obvious key is albumIndex.builtAt, and it is
-// wrong: builtAt only moves on a full walk, so on a library that has stopped
-// growing it never advances — while `plays` changes every time something is
-// listened to. A profile cached that way freezes the play counts at whatever
-// they were on the first build, and plays-per-album-owned is the seed policy.
-// One pass over the albums costs a few hundred ms, once a day, in a background
-// job. It has exactly one caller.
-function libraryArtistProfile() {
-  const stats = playStats();
-  const map = new Map();
-  for (const al of albumIndex.albums) {
-    const plays = stats.count.get(albumPlayKey(al)) || 0;
-    for (const name of splitCreditIntoArtists(al.subtitle || "")) {
-      const c = canonArtist(name);
-      // canonArtist returns "" for a punctuation- or CJK-only credit ("!!!").
-      // An empty key would merge every such act into one bogus artist.
-      if (!c) continue;
-      let rec = map.get(c);
-      if (!rec) { rec = { canon: c, name, albums: 0, plays: 0 }; map.set(c, rec); }
-      rec.albums++;
-      rec.plays += plays;
-    }
-  }
-  return map;
-}
-
-// Which library artists to walk out from.
-//
-// Two filters and one sort. Hubs are excluded because seeding from them is what
-// makes a recommender boring. What remains is sorted by plays PER ALBUM OWNED:
-// an act with four plays across one album is a stronger statement of taste than
-// one with six plays spread over twelve, and it is the small, deliberate
-// corners of a library that lead somewhere new.
-//
-// A library with no play history yet still has to work, so the list is topped up
-// with the most-owned non-hub artists — owning a lot by an artist the world
-// isn't listening to is itself a taste signal.
-function smartPickSeeds(profile, hubCanons, limit) {
-  const cap = limit || smartSeedCount();
-  const eligible = [];
-  for (const rec of profile.values()) {
-    if (hubCanons.has(rec.canon)) continue;
-    eligible.push(rec);
-  }
-  const byCanon = (a, b) => (a.canon < b.canon ? -1 : a.canon > b.canon ? 1 : 0);
-  const played = eligible.filter(r => r.plays > 0).sort((a, b) =>
-    (b.plays / b.albums) - (a.plays / a.albums) || a.albums - b.albums || byCanon(a, b));
-  const out = played.slice(0, cap);
-  if (out.length < cap) {
-    const have = new Set(out.map(r => r.canon));
-    const rest = eligible.filter(r => !have.has(r.canon))
-      .sort((a, b) => b.albums - a.albums || byCanon(a, b));
-    for (const r of rest) {
-      if (out.length >= cap) break;
-      out.push(r);
-    }
-  }
-  return out;
-}
-
-// Fold similar-artist rows into one entry per candidate, remembering EVERY seed
-// each was reached from — that count is the distance signal, so a candidate
-// arriving twice must not overwrite itself.
-function collectSmartCandidates(rows, seedNameByMbid) {
-  const byMbid = new Map();
-  for (const r of rows || []) {
-    if (!r || !r.mbid || !r.name) continue;
-    const canon = canonArtist(r.name);
-    if (!canon) continue;
-    let rec = byMbid.get(r.mbid);
-    if (!rec) {
-      rec = { mbid: r.mbid, name: r.name, canon, comment: r.comment || "",
-              score: 0, seeds: [], seedNames: [] };
-      byMbid.set(r.mbid, rec);
-    }
-    if (r.score > rec.score) rec.score = r.score;
-    if (r.seed && rec.seeds.indexOf(r.seed) === -1) {
-      rec.seeds.push(r.seed);
-      const sn = seedNameByMbid && seedNameByMbid.get(r.seed);
-      if (sn) rec.seedNames.push(sn);
-    }
-  }
-  return Array.from(byMbid.values());
-}
-
-// Rank by distance from the library rather than by similarity to it.
-//
-// Fewest connections back first. With a couple of dozen seeds most candidates
-// sit in the one-seed bucket, so score decides within it — which is why hub
-// candidates have to be filtered out before this runs, or the strongest score
-// in that bucket is simply the most famous name in it.
-function rankSmartCandidates(cands) {
-  return (cands || []).slice().sort((a, b) =>
-    a.seeds.length - b.seeds.length ||
-    b.score - a.score ||
-    (a.canon < b.canon ? -1 : a.canon > b.canon ? 1 : 0));
-}
-
-// Spread the day's picks across DIFFERENT corners of the library.
-//
-// Ranking alone produces a monoculture, and measurably so: on a test library
-// seeded from Bark Psychosis, Slint, Stars of the Lid, Labradford and Tortoise,
-// the top five candidates were all neighbours of Stars of the Lid — five
-// ambient records that between them said one thing. The distance sort cannot
-// prevent that, because once most candidates sit in the one-seed bucket it
-// decides on score alone, and the loudest seed owns every slot.
-//
-// So the ranked list is dealt round-robin: the best candidate from each seed,
-// then each seed's second, and so on. Rank order is preserved WITHIN a seed,
-// and the seed queues are already in rank order, so the strongest candidate
-// overall still comes first — it just no longer brings four relatives with it.
-function diversifySmartCandidates(ranked) {
-  const bySeed = new Map();
-  for (const c of ranked || []) {
-    // A candidate's first seed is its strongest connection: `seeds` is filled
-    // in arrival order from a list the endpoint returns strongest-first.
-    const key = (c.seeds && c.seeds[0]) || "";
-    if (!bySeed.has(key)) bySeed.set(key, []);
-    bySeed.get(key).push(c);
-  }
-  const queues = Array.from(bySeed.values());
-  const out = [];
-  for (let round = 0; ; round++) {
-    let moved = false;
-    for (const q of queues) {
-      if (round < q.length) { out.push(q[round]); moved = true; }
-    }
-    if (!moved) break;   // every queue exhausted
-  }
-  return out;
-}
-
-// Everything a candidate must not be. Kept as one function so the adjacent and
-// every path agrees on what counts as "already known".
-function smartPickExcluded(canon, sets) {
-  if (!canon) return true;
-  if (sets.library.has(canon)) return true;   // already owned
-  if (sets.hubs.has(canon)) return true;      // famous is not a discovery
-  if (sets.blocked.has(canon)) return true;   // user said "not for me"
-  if (sets.seen.has(canon)) return true;      // shown recently
-  return false;
-}
-
-// The sentence under a pick. Built from the chain that produced it, so it is
-// always true — an LLM would write a nicer one and would sometimes be wrong,
-// and a recommendation nobody can check is a recommendation nobody trusts.
-function smartPickReason(rec) {
-  const names = (rec.seedNames || []).filter(Boolean);
-  if (!names.length) return "Close to what you already listen to";
-  if (names.length === 1) return "Because you play " + names[0];
-  return "Because you play " + names[0] + " and " + names[1];
-}
+// Which of your artists Smart Picks starts from (lib/smart-picks/, 2.0.6-t22, smart-picks.md §3).
+const smartSeedInput = createSeedInput({
+  albums: () => albumIndex.albums, keyOf: (al) => listenKey(al), splitCredit: splitCreditIntoArtists, canonArtist,
+  genresOf: (al) => albumGenresOf(al), yearOf: (al) => albumYearOf(al), listening, cap: () => smartSeedCount(),
+  libraryRecord: (title, artist) => smartLibraryRecord(title, artist),
+  // Every album Smart Picks has suggested to the profile. A database that can't be read throws here, and the build fails
+  // saying so: never seeds that count a pick being tried.
+  suggested: (p) => (labelsDb ? labelsDb.prepare("SELECT DISTINCT album, artist FROM smart_picks WHERE album IS NOT NULL AND profile = ?").all(p) : []),
+  whoOf: (p) => profiles.who(p),   // each profile's own plays (profiles.md §3, 2.0.7-t3)
+});
+function smartSeedsFor(hubs, tune, profile) { return smartSeedInput.seedsFor(hubs, tune, profile); }
+// Tune (smart-picks.md §5): each profile's (2.0.7-t3), the one kept before profiles the first's.
+const smartTunes = createTunes({ settings: loadPersistedSettings, save: savePersistedSettings, first: () => profiles.store.first().id, canonArtist });
+function smartTune(profile) { return smartTunes.get(profile); }
+function smartTuneMoved(from, to) { smartTunes.move(from, to); }   // a profile removed: its Tune with its listening
+// Rebuild, "Not for me" and Tune: lib/routes/smart-picks-actions.js (the first two moved out of here in 2.0.7-t1).
+mountSmartPicksActions(app, { paired: () => !!core, today: () => smartDayKey(), dest: () => smartPicksDest, db: () => labelsDb,
+  attemptKey: (day, p) => smartAttemptKey(day, p), forgetLaterDay: (day, p) => listenLaterForgetPicksOfDay(day, p),
+  forgetPickArtist: (canon, p) => listenLaterForgetPickArtist(canon, p), bump: () => { picksVersion++; },
+  kick: (o) => kickSmartPicks(o && o.tuned ? "tuned" : "manual", true, o), running: () => smartPicksBuilding(), log: (l) => console.error(l), canonArtist, blockStmt: () => stmtInsertSmartBlock,
+  owner: profiles.owner, tune: smartTune, saveTune: (p, t) => smartTunes.set(p, t),
+  // The hub chart as last fetched, never fetched here: the Tune sheet's lists don't wait on ListenBrainz.
+  listened: (p) => smartSeedInput.listened(new Set((smartCacheGet("hubs", smartHubTtlMs()) || []).map((r) => canonArtist(r.name)).filter(Boolean)), p) });
 
 // ---------------------------------------------------------------------------
 // Smart Picks: cached API reads. Every one of these is persisted, so a rebuild
@@ -10875,40 +10573,25 @@ function qobuzReady() {
 }
 function tidalReady() { return !!(tidalRefreshToken && tidalUserId); }
 
-// Favourite a resolved pick's album on the service it came from.
-//
-// Used for the five adjacent picks at build time so Roon has the whole night to
-// import them: by morning they are in the library and simply play, which is the
-// point of running this at 4am. Idempotent on both services — favouriting an
-// album already favourited is a no-op — so a rebuild cannot double anything.
-//
-// Returns true when the service accepted it. A failure is logged and the pick
-// still ships; the user can add it by hand.
-async function autoAddSmartAlbum(album) {
-  if (!album || !album.id || !album.service) return false;
-  try {
-    if (album.service === "qobuz") {
-      await qobuzWithToken(t => qobuz.favoriteAlbum(t, String(album.id)));
-      qobuzFavIds.add(String(album.id));
-    } else if (album.service === "tidal") {
-      await tidalWithToken((t, cc, uid) => tidal.favoriteAlbum(t, cc, uid, String(album.id)));
-      tidalFavIds.add(String(album.id));
-    } else {
-      return false;
-    }
-    return true;
-  } catch (e) {
-    if (smartRateLimited(e)) throw e;   // let the build stop rather than hammer
-    console.error("[picks] could not auto-add " + JSON.stringify(album.title) +
-                  " to " + album.service + ": " + e.message);
-    return false;
-  }
-}
-
-// Is a streaming service connected at all? Without one a pick can be shown but
-// never added, so the UI needs to say so rather than presenting a dead button —
-// and the build must not run at all, since every resolve would return null.
-function smartPicksServiceReady() { return qobuzReady() || tidalReady(); }
+const deezerJson = (path) => httpJson("https://api.deezer.com/" + path);   // similar acts; a Roon-found pick's cover
+// A pick's album found and added (lib/smart-picks/resolve.js, smart-picks.md §11): Roon's, else Rouen's Qobuz and TIDAL.
+const pickAlbums = createPickAlbums({
+  canon: canonArtist, albumKey, ttlMs: smartAlbumTtlMs(),
+  cacheGet: (k, ttl) => smartCacheGet(k, ttl), cacheSet: (k, v) => smartCacheSet(k, v),
+  native: () => (roonDirect.active() ? roonDirect.finder : null),
+  // favIds is deliberately not fetched: it fills only `favourited`, which persistSmartPicks does not store.
+  qobuz: { ready: qobuzReady, albums: async (name) => normalizeQobuzAlbums((await qobuzWithToken(t => qobuz.searchCatalog(t, name, 20, 0))).albums.items, new Set()) },
+  tidal: { ready: tidalReady, artists: (name) => tidalWithToken((t, cc) => tidal.searchArtists(t, cc, name, 5)),
+    albums: async (id) => { const page = await tidalWithToken((t, cc) => tidal.getArtistAlbums(t, cc, id, 20, 0)); return normalizeTidalAlbums((page && page.items) || [], new Set()); } },
+  deezer: (path) => deezerJson(path),
+  libraryAdd: () => libraryAdd, asRoonOf: (p, fn) => profiles.asRoonOf(p, fn),
+  signedIn: (service) => (service === "qobuz" ? qobuzReady() : tidalReady()), favourite: (service, id) => serviceFavourites.set(service, id, true),
+  rateLimited: smartRateLimited, log: (line) => console.log(line), error: (line) => console.error(line),
+});
+// The build's names for them, unchanged (test/unit/smartpicks-build.test.js injects them). Ready: anything to find with.
+function autoAddSmartAlbum(album, artist, profile) { return pickAlbums.add(album, artist, profile); }
+function smartPicksServiceReady() { return pickAlbums.ready(); }
+function resolveSmartAlbum(artistName) { return pickAlbums.find(artistName); }
 
 // Thrown to abort a whole build when a service rate-limits us. These are the
 // UNOFFICIAL Qobuz/TIDAL APIs, and the accounts behind them also power the
@@ -10918,81 +10601,6 @@ function smartRateLimited(e) { return !!(e && e.code === 429); }
 
 // How long a resolved (or unresolvable) artist->album answer is trusted.
 function smartAlbumTtlMs() { return 7 * 24 * 60 * 60 * 1000; }
-
-// Find a favouritable album by `artistName` on whichever service is connected.
-// Returns a normalized album (plus which service it came from) or null.
-//
-// PERSISTED, INCLUDING MISSES. This is the one call that dominates a build —
-// every candidate TRIED costs a search, not every candidate kept — so caching
-// only the hits would leave the expensive half uncached. A miss is stored as
-// { album: null }, which is truthy, so a cached negative is distinguishable
-// from a cache miss.
-async function resolveSmartAlbum(artistName) {
-  const wantCanon = canonArtist(artistName);
-  if (!wantCanon) return null;
-  const key = "alb:" + wantCanon;
-  const hit = smartCacheGet(key, smartAlbumTtlMs());
-  if (hit) return hit.album;
-
-  let album = null;
-  // Whether a service actually ANSWERED. A negative may only be cached when one
-  // did: caching "no album" after consulting nothing would write up to 150 dead
-  // entries on a machine with no service connected, and the user who then
-  // connects Qobuz would get an empty feature for the next seven days with no
-  // way to tell why. A thrown lookup is the same case — the codebase already
-  // states this discipline for the TTL cache ("the PROMISE is shared, never the
-  // failure"), and a one-minute token blip must not become a week-long hole.
-  let answered = false, errored = false;
-  if (qobuzReady()) {
-    try {
-      const r = await qobuzWithToken(t => qobuz.searchCatalog(t, artistName, 20, 0));
-      answered = true;
-      // favIds is deliberately not fetched: it fills only the `favourited`
-      // field, which persistSmartPicks does not store and the client never
-      // reads. Fetching it cost an extra Qobuz call (and a large paged TIDAL
-      // one) per minute of a build, for a value thrown away.
-      const albums = normalizeQobuzAlbums(r.albums.items, new Set());
-      // Qobuz search matches on title as well as artist, so an unfiltered top
-      // hit is regularly a different act covering the name. Require the credit
-      // to be the artist we asked for. canonArtist rather than namesEqualLoose
-      // (which the artist-bio path uses) because this must agree with the
-      // library/hub/blocked sets, which are all keyed in canonArtist space.
-      const found = albums.find(a => canonArtist(a.artist) === wantCanon);
-      if (found) album = Object.assign({ service: "qobuz" }, found);
-    } catch (e) {
-      if (smartRateLimited(e)) throw e;      // abort the build, do not hammer
-      errored = true;
-      console.error("[picks] Qobuz album lookup for " +
-                    JSON.stringify(artistName) + " failed: " + e.message);
-    }
-  }
-  if (!album && tidalReady()) {
-    try {
-      // searchArtists returns pagedSection(r) — { items, total } — NOT an array.
-      // `(found || []).find` reads as defensive and is not: an object is truthy,
-      // so the fallback never fires and .find is undefined. That threw on every
-      // lookup, and the catch turned it into "no pick resolved" — which on a
-      // TIDAL-only setup meant zero picks, forever.
-      const page = await tidalWithToken((t, cc) => tidal.searchArtists(t, cc, artistName, 5));
-      answered = true;
-      const found = ((page && page.items) || []).find(
-        a => a && canonArtist(a.name) === wantCanon);
-      if (found && found.id) {
-        const page2 = await tidalWithToken(
-          (t, cc) => tidal.getArtistAlbums(t, cc, found.id, 20, 0));
-        const albums = normalizeTidalAlbums((page2 && page2.items) || [], new Set());
-        if (albums.length) album = Object.assign({ service: "tidal" }, albums[0]);
-      }
-    } catch (e) {
-      if (smartRateLimited(e)) throw e;
-      errored = true;
-      console.error("[picks] TIDAL album lookup for " +
-                    JSON.stringify(artistName) + " failed: " + e.message);
-    }
-  }
-  if (album || (answered && !errored)) smartCacheSet(key, { album });
-  return album;
-}
 
 // ---------------------------------------------------------------------------
 // Smart Picks: the daily build.
@@ -11029,27 +10637,26 @@ function smartDayKey(d) {
   return t.getFullYear() + "-" + p(t.getMonth() + 1) + "-" + p(t.getDate());
 }
 
-function smartSeenSet() {
+// A profile's (profiles.md §3, 2.0.7-t3): the artists it was shown, its "Not for me", its picks of a day.
+function smartSeenSet(profile) {
   const set = new Set();
   if (!labelsDb) return set;
   try {
     const cutoff = Date.now() - smartSeenDays() * 24 * 60 * 60 * 1000;
     for (const r of labelsDb.prepare(
-      "SELECT canon FROM smart_pick_seen WHERE ts > ?").all(cutoff)) set.add(r.canon);
+      "SELECT canon FROM smart_pick_seen WHERE ts > ? AND profile = ?").all(cutoff, profile)) set.add(r.canon);
   } catch (e) { if (DEBUG) console.error("[picks] seen set: " + e.message); }
   return set;
 }
-function smartBlockedSet() {
+function smartBlockedSet(profile) {
   const set = new Set();
   if (!labelsDb) return set;
   try {
-    for (const r of labelsDb.prepare("SELECT canon FROM smart_pick_blocks").all()) {
-      set.add(r.canon);
-    }
+    for (const r of labelsDb.prepare("SELECT canon FROM smart_pick_blocks WHERE profile = ?").all(profile)) set.add(r.canon);
   } catch (e) { if (DEBUG) console.error("[picks] blocked set: " + e.message); }
   return set;
 }
-function readSmartPicks(day) {
+function readSmartPicks(day, profile) {
   if (!labelsDb) return [];
   try {
     return labelsDb.prepare(
@@ -11057,7 +10664,7 @@ function readSmartPicks(day) {
       // picks at 0-4. Sorting on kind as well once put a second kind first
       // (it sorted later, so DESC lifted it), which
       // led the row with the one pick chosen for being unlike the library.
-      "SELECT * FROM smart_picks WHERE day = ? ORDER BY rank ASC").all(day);
+      "SELECT * FROM smart_picks WHERE day = ? AND profile = ? ORDER BY rank ASC").all(day, profile);
   } catch (e) {
     if (DEBUG) console.error("[picks] read " + day + ": " + e.message);
     return [];
@@ -11075,35 +10682,40 @@ function smartMaxResolves()      { return 40; }
 // not retried on the next request. Without this, "did we build today?" is
 // answered by "are there rows?", and a zero-pick day re-runs the whole pipeline
 // every time anybody opens Home.
-function smartAttemptKey(day) { return "built:" + day; }
-function smartAttemptedToday(day) {
-  return !!smartCacheGet(smartAttemptKey(day), 24 * 60 * 60 * 1000);
+// Each profile's (2.0.7-t3, the review): one profile's build, rebuilt or failing, says nothing of another's.
+function smartAttemptKey(day, profile) { return "built:" + day + ":" + profile; }
+function smartAttemptedToday(day, profile) {
+  return !!smartCacheGet(smartAttemptKey(day, profile), 24 * 60 * 60 * 1000);
 }
 
 // Build today's picks. Called from the maintenance timer and after a sync —
 // never from a request handler, so nothing a user does waits on it.
-async function buildSmartPicks(day) {
+// Each active profile's picks (profiles.md §3, §10.10; lib/smart-picks/daily.js); a Rebuild or Tune change, its own.
+function buildSmartPicks(day, opts) {
+  return buildEach(day, opts, { profiles: () => profiles.picksProfiles(), has: (d, p) => readSmartPicks(d, p).length > 0,
+    tried: (d, p) => smartAttemptedToday(d, p), build: (d, p) => buildSmartPicksFor(d, p, opts) });
+}
+async function buildSmartPicksFor(day, profile, opts) {
   const t0 = Date.now();
+  const dest = opts && opts.tuned && smartPicksDest === "library" ? "ask" : smartPicksDest;   // Tune's: Add, nothing favourited (owner)
   smartCachePrune();
   // Nothing here can produce an addable pick without a service to add it to,
   // and an unaddable pick is not worth the calls it costs to find.
+  // Not marked tried (smart-picks.md §11): the next check builds, the same day, once native mode or a service is up.
   if (!smartPicksServiceReady()) {
-    console.log("[picks] no streaming service connected — skipping today's build");
-    smartCacheSet(smartAttemptKey(day), { at: Date.now(), reason: "no service" });
+    if (pickAlbums.sayNotReady(day)) console.log("[picks] neither native mode nor a streaming service to find albums with — skipping until one is");
     return;
   }
-  const profile = libraryArtistProfile();
-  if (!profile.size) {
+  pickAlbums.tally();   // this build's own count from here
+  if (!albumIndex.albums.length) {
     console.log("[picks] no library artists yet — nothing to build from");
     return;   // deliberately NOT marked attempted: the library is still arriving
   }
   const hubs = await smartHubSet();
-  // An empty hub chart is not a harmless degradation. It is what the entire
-  // seed policy is built on: with no hubs, smartPickSeeds stops filtering and
-  // seeds from the user's most-played artists — Radiohead, Pink Floyd — which
-  // is the exact inversion this feature exists to avoid, and smartPickExcluded
-  // stops rejecting famous candidates too. Better no picks today than a day of
-  // picks that quietly discredit the feature.
+  // An empty hub chart is not a harmless degradation: with no hubs the famous
+  // seed at full weight (smart-picks.md §3.2) and smartPickExcluded stops
+  // rejecting famous candidates. Better no picks today than a day of picks that
+  // quietly discredit the feature.
   if (!hubs.size) {
     console.error("[picks] the sitewide artist chart came back empty — " +
                   "skipping today's build rather than seeding from the " +
@@ -11113,19 +10725,21 @@ async function buildSmartPicks(day) {
   const sets = {
     library: linkableArtistSet(),
     hubs,
-    blocked: smartBlockedSet(),
-    seen:    smartSeenSet()
+    blocked: smartBlockedSet(profile),
+    seen:    smartSeenSet(profile)
   };
 
   // Seeds, and their MBIDs. fetchArtistMbid rate-limits itself against
   // MusicBrainz and refuses a fuzzy name match, so a seed it cannot identify is
   // dropped rather than walked from the wrong artist.
-  const seeds = smartPickSeeds(profile, hubs, smartSeedCount());
+  const tune = smartTune(profile);
+  const chosen = smartSeedsFor(hubs, tune, profile);
   const seedNameByMbid = new Map();
   const seedMbids = [];
-  for (const s of seeds) {
+  const noMbid = [];
+  for (const s of chosen.seeds) {
     const mbid = await fetchArtistMbid(s.name);
-    if (!mbid) continue;
+    if (!mbid) { noMbid.push(s.name); continue; }
     seedMbids.push(mbid);
     seedNameByMbid.set(mbid, s.name);
   }
@@ -11135,9 +10749,9 @@ async function buildSmartPicks(day) {
   }
 
   const rows  = await smartSimilarRows(seedMbids);
-  const cands = collectSmartCandidates(rows, seedNameByMbid)
+  const cands = collectSmartCandidates(rows, seedNameByMbid, canonArtist)
     .filter(c => !smartPickExcluded(c.canon, sets));
-  const ranked = diversifySmartCandidates(rankSmartCandidates(cands))
+  const ranked = diversifySmartCandidates(rankSmartCandidates(cands, tune.adventure))
     .slice(0, smartPoolCount());
   console.log("[picks] " + seedMbids.length + " seeds -> " + rows.length +
               " rows -> " + cands.length + " candidates (" + ranked.length + " pooled)");
@@ -11161,14 +10775,14 @@ async function buildSmartPicks(day) {
       // library now, so Roon can import them before anybody looks at the
       // screen — that is what makes them playable by morning rather than a
       // button somebody has to press.
-      const added = smartPicksDest === "library" ? await autoAddSmartAlbum(album) : false;
+      const added = dest === "library" ? await autoAddSmartAlbum(album, c.name, profile) : false;
       // Listen later instead: put aside, not favourited. Native mode on, your server's own list (native-remote.md
       // §10.4): each put searches and waits for it, so they run alongside the build and are waited for once, after.
-      if (smartPicksDest === "later") {
+      if (dest === "later") {
         // The PICK's artist, not the service's credit: the card's own "＋ Listen later" and "Not for me" are keyed on it.
-        laterPuts.push(listenLater.put({ title: album.title, artist: c.name,
+        laterPuts.push(profiles.asRoonOf(profile, () => listenLater.put({ title: album.title, artist: c.name,
                                 service: album.service, album_id: String(album.id),
-                                image: album.image || "", source: "picks" }));
+                                image: album.image || "", source: "picks", profile })));   // its profile's, on its Roon list (§5, §12)
       }
       picks.push({
         kind: "adjacent", mbid: c.mbid, artist: c.name, canon: c.canon,
@@ -11185,19 +10799,30 @@ async function buildSmartPicks(day) {
                   picks.length + " pick(s) resolved so far and stopping");
   }
 
+  // Nothing answered for any candidate (native mode's searches refused, a service's sign-in failing): not a day's answer,
+  // so neither kept nor marked tried — the next check builds again (smart-picks.md §11, the review).
+  const roon = pickAlbums.tally();
+  if (!picks.length && tried && !roon.heard) {
+    console.log("[picks] nothing answered for any of the " + tried + " candidates tried — not kept, tried again at the next check");
+    return;
+  }
   await Promise.all(laterPuts);   // each put says its own failure; none rejects
-  persistSmartPicks(day, picks);
-  smartCacheSet(smartAttemptKey(day), { at: Date.now(), picks: picks.length });
-  console.log("[picks] built " + picks.length + " picks for " + day +
-              " (" + tried + " candidates tried) in " + (Date.now() - t0) + "ms");
+  persistSmartPicks(day, picks, profile);
+  // Why these picks (§6), with the picks it explains and the Tune it was built with.
+  smartCacheSet("why:" + profile, whyOf(day, chosen, noMbid, Date.now(), { halfLifeDays: halfLifeOf(tune), tuned: describeTune(tune), picks }));
+  smartCacheSet(smartAttemptKey(day, profile), { at: Date.now(), picks: picks.length });
+  console.log("[picks] built " + picks.length + " picks for " + day + ", profile " + profile +
+              " (" + tried + " candidates tried" + (roon.asked ? "; Roon's search found an album for " + roon.found + " of " + roon.asked : "") +
+              ") in " + (Date.now() - t0) + "ms");
 }
 
-function persistSmartPicks(day, picks) {
+function persistSmartPicks(day, picks, profile) {
   if (!labelsDb || !stmtInsertSmartPick) return;
+  if (!profiles.store.get(profile)) return;   // removed while its build ran: nothing kept under its id
   try {
-    const wipe = labelsDb.prepare("DELETE FROM smart_picks WHERE day = ?");
+    const wipe = labelsDb.prepare("DELETE FROM smart_picks WHERE day = ? AND profile = ?");
     const tx = labelsDb.transaction(() => {
-      wipe.run(day);
+      wipe.run(day, profile);
       let rank = 0;
       const kinds = smartPickKinds();
       for (const p of picks) {
@@ -11210,10 +10835,10 @@ function persistSmartPicks(day, picks) {
           continue;
         }
         stmtInsertSmartPick.run(
-          day, p.kind, rank++, p.mbid || "", p.artist, p.canon,
+          profile, day, p.kind, rank++, p.mbid || "", p.artist, p.canon,
           p.album.title, String(p.album.id), p.album.service, p.album.image || "",
           smartPickReason(p), p.genre || "", Date.now());
-        stmtInsertSmartSeen.run(p.canon, Date.now());
+        stmtInsertSmartSeen.run(profile, p.canon, Date.now());
       }
     });
     tx();
@@ -11235,7 +10860,8 @@ function persistSmartPicks(day, picks) {
 // it does not collapse duplicates, so three devices opening Home would enqueue
 // three identical builds and triple every upstream call.
 let _smartBuilding = null;
-function kickSmartPicks(why, force) {
+function smartPicksBuilding() { return _smartBuilding; }
+function kickSmartPicks(why, force, opts) {
   // The single gate. Every caller — the timer, the post-sync kick, the request
   // path and the manual rebuild button — comes through here, so one check
   // covers all of them and none can drift. Off means no MusicBrainz, no
@@ -11244,21 +10870,22 @@ function kickSmartPicks(why, force) {
   const day = smartDayKey();
   if (_smartBuilding) return;
   if (!force) {
-    if (readSmartPicks(day).length) return;
-    if (smartAttemptedToday(day)) return; // already tried today; do not retry per request
+    // Nothing to find an album with: no job at all. Each would bump picksVersion, and the screens it wakes would ask
+    // again, kicking another (smart-picks.md §11: the day isn't marked tried, so this is what keeps it quiet).
+    if (!smartPicksServiceReady()) return;
+    // Every active profile built, or tried today (a profile whose build found nothing is not retried per request).
+    if (profiles.picksProfiles().every((p) => readSmartPicks(day, p).length || smartAttemptedToday(day, p))) return;
     // ONE place decides whether the schedule has been reached, so the timer,
     // the post-sync kick and an ordinary page view cannot disagree — the whole
     // point of the setting is that the build never runs at an unexpected time.
     if (!smartPicksDue()) return;
   }
-  _smartBuilding = bgRun("smart picks (" + why + ")", () => buildSmartPicks(day))
-    .finally(() => { _smartBuilding = null; picksVersion++; });
+  // By hand (Rebuild, Tune): now, as the household, not behind the queue's 20-minute genre walk (smart-picks.md §11).
+  const job = () => buildSmartPicks(day, opts), what = "smart picks (" + why + ")";
+  _smartBuilding = (force ? Promise.resolve().then(() => asHousehold(job)).catch((e) => console.error("[bg] " + what + " failed: " + e.message))
+    : bgRun(what, job)).finally(() => { _smartBuilding = null; picksVersion++; });
 }
 
-// Hourly check, matching the existing index-maintenance and updater timers.
-// A timer rather than the first request of the day, so the cost never lands on
-// somebody's page load and the retry cadence isn't a function of how often
-// anyone taps Back.
 // Should the scheduled build run right now?
 //
 // Only at or after the configured hour, and only on a day that has not been
@@ -11317,53 +10944,10 @@ function smartPickServiceLinks(row, linkOpts) {
   return list;
 }
 
-function smartPickJson(row, favs, laterRows, linkOpts) {
-  const id  = row.album_id || "";
-  const set = row.service === "qobuz" ? favs.qobuz
-            : row.service === "tidal" ? favs.tidal : null;
-  const rec = smartLibraryRecord(row.album, row.artist);
-  return {
-    kind:    row.kind,
-    artist:  row.artist,
-    mbid:    row.mbid || null,
-    album:   row.album || "",
-    album_id: id,
-    service: row.service || "",
-    image:   row.image || "",
-    reason:  row.reason || "",
-    genre:   row.genre || "",
-    // null (not false) when the service could not be asked, so the client can
-    // leave the button alone rather than claiming it is not added.
-    added:   set ? set.has(id) : null,
-    // In the Roon library right now — playable.
-    offset:      rec ? rec.offset : null,
-    library_title:    rec ? rec.title : "",
-    library_subtitle: rec ? rec.subtitle : "",
-    image_key:        rec ? (rec.image_key || null) : null,
-    // On the Listen later list (v1.8.67), so the card can say so.
-    later:            listenLater.has(row.album || "", row.artist, laterRows),
-    // Not in the library: where a tap goes, by the device's default service.
-    services:         rec ? [] : smartPickServiceLinks(row, linkOpts)
-  };
-}
-
-// The user's current favourite ids on each connected service. Either side
-// failing is reported as null — "not asked" — rather than as an empty set,
-// which would tell the client that nothing is added.
-async function smartPickFavourites() {
-  const out = { qobuz: null, tidal: null };
-  const jobs = [];
-  if (qobuzReady()) {
-    jobs.push(qobuzFavIds.get().then(s => { out.qobuz = s; })
-      .catch(e => { console.error("[picks] Qobuz favourites unavailable: " + e.message); }));
-  }
-  if (tidalReady()) {
-    jobs.push(tidalFavIds.get().then(s => { out.tidal = s; })
-      .catch(e => { console.error("[picks] TIDAL favourites unavailable: " + e.message); }));
-  }
-  await Promise.all(jobs);
-  return out;
-}
+// Each pick as the screens get it, and the services' favourite ids (lib/smart-picks/json.js, moved out in 2.0.7-t4).
+const pickJson = createPickJson({ libraryRecord: smartLibraryRecord, laterHas: (t, a, rows) => listenLater.has(t, a, rows),
+  serviceLinks: smartPickServiceLinks, qobuzReady, tidalReady, qobuzFavIds: () => qobuzFavIds, tidalFavIds: () => tidalFavIds });
+function smartPickFavourites() { return pickJson.favourites(); }
 
 // GET /api/smart-picks — today's six. A pure read: it answers from the table
 // and, if today has not been built yet, kicks the build and returns what it has
@@ -11382,7 +10966,9 @@ app.get("/api/smart-picks", async (req, res) => {
   }
   try {
     const day  = smartDayKey();
-    const rows = readSmartPicks(day);
+    const mine = profiles.picksOf(req.profile);   // the device's profile's; Guest has none (the owner, 2026-11-26)
+    if (mine === null) return res.json({ error: "Guest has no Smart Picks. Choose your profile in the side menu for yours." });
+    const rows = readSmartPicks(day, mine);
     if (!rows.length) kickSmartPicks("requested");
     // The favourites read is a 60s-cached lookup, not a per-request round trip.
     const favs = rows.length ? await smartPickFavourites() : { qobuz: null, tidal: null };
@@ -11401,7 +10987,7 @@ app.get("/api/smart-picks", async (req, res) => {
           locale:  shareLinks.localeFromAcceptLanguage(req.headers["accept-language"]),
           enabled: enabledServices(shareLinks, st),
         };
-        return rows.map(r => smartPickJson(r, favs, later, linkOpts));
+        return rows.map(r => pickJson.pickJson(r, favs, later, linkOpts));
       })()
     });
   } catch (e) {
@@ -11410,242 +10996,24 @@ app.get("/api/smart-picks", async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// Listen later (v1.8.67) — albums put aside to play another time.
-//
-// Ported from Mandarin, which grew out of this extension and has had it since
-// its v0.5.28. Roon's own Listen later is not reachable through the extension
-// API, so this is the extension's own list, kept on the data volume.
-//
-// WHAT AN ENTRY IS. An album identity (albumKey) plus the strings it was put
-// aside under — never an offset, which is a position in a list that reshuffles
-// on every library change. Resolved against the snapshot at READ time
-// (smartLibraryRecord, the same tolerant albumKeys match the Smart Picks use),
-// so an entry follows its album through a rescan, and an entry for an album
-// Roon does not have yet — a Smart Pick sent here instead of to the streaming
-// library — becomes playable the moment Roon imports it, with nothing written.
-//
-// HOW AN ENTRY LEAVES. By hand, or once every track of the album has been
-// played through since it was put aside, on any zone, from any app — the rule
-// Mandarin uses. "Every track" is read from album_tracks, which only knows an
-// album this extension has opened; for one it never has, the list cannot tell
-// a played-through album from a sampled one, so the entry stays until it is
-// taken off by hand rather than leaving on a guess.
-// ---------------------------------------------------------------------------
-
-function listenLaterServices() { return ["qobuz", "tidal"]; }
-function listenLaterSources()  { return ["album", "picks"]; }
-
-function listenLaterRows() {
-  if (!labelsDb) return [];
-  try {
-    return labelsDb.prepare("SELECT * FROM listen_later ORDER BY ts DESC").all();
-  } catch (e) {
-    console.error("[later] read failed: " + e.message);
-    return [];
-  }
-}
-
-// The library album `title`/`artist` names right now, or null: the exact edition first (lib/library-exact.js, moved out
-// in v1.9.49, which says why), then the tolerant match.
+// Listen later (v1.8.67): lib/listen-later/store.js. A title's library album: exact first (lib/library-exact.js), then tolerant.
 const libraryExact = createExactIndex({ index: () => albumIndex, albumKey });
+const laterStore = createLaterStore({ db: () => labelsDb, bump: bumpLaterVersion, frozen: () => settingsStore.frozen(),
+  albumKey, canonText, canonArtist, exact: libraryExact, tolerant: smartLibraryRecord, listening, listenKey, qobuzDeep, owners: laterOwners });
+// The names the routes and the Smart Picks were given before the move, read before this line runs (hoisted).
+function listenLaterRows() { return laterStore.rows(); }
+function listenLaterLibraryRecord(title, artist) { return laterStore.libraryRecord(title, artist); }
+function listenLaterMatches(title, artist, rows) { return laterStore.matches(title, artist, rows); }
+function listenLaterAdd(entry) { return laterStore.add(entry); }
+function listenLaterRemove(title, artist) { return laterStore.remove(title, artist); }
+function listenLaterForgetPickArtist(canon, profile) { return laterStore.forgetPickArtist(canon, profile); }
+function listenLaterForgetPicksOfDay(day, profile) { return laterStore.forgetPicksOfDay(day, profile); }
+function listenLaterNoticePlay(albumTitle, profile) { laterStore.noticePlay(albumTitle, profile); }
+function listenLaterServiceUrl(service, albumId) { return laterStore.serviceUrl(service, albumId); }
 // Where `title`/`artist` sit in the library right now, under Roon's own strings (what a Play opens it by), or
 // null: the exact edition first, as above (TIDAL and Qobuz pages, and Add to library, v1.9.39 and v1.9.41).
 function libraryRecordOf(title, artist) { const rec = listenLaterLibraryRecord(title, artist); return rec ? { offset: rec.offset, title: rec.title, subtitle: rec.subtitle } : null; }
 function libraryOffsetOf(title, artist) { const rec = libraryRecordOf(title, artist); return rec ? rec.offset : null; }
-function listenLaterLibraryRecord(title, artist) {
-  if (!title) return null;
-  return libraryExact.find(title, artist) || smartLibraryRecord(title, artist);
-}
-
-// The library record an entry stands for right now, or null.
-function listenLaterRecord(row) {
-  return listenLaterLibraryRecord(row.title, row.artist);
-}
-
-// Every key that names the same album as `title`/`artist`: its own identity
-// and, when it resolves to a library record, that record's identity — so an
-// entry stored under a service's spelling ("Album (Deluxe)") is found from
-// Roon's ("Album"), and the other way round.
-function listenLaterKeysFor(title, artist) {
-  const keys = new Set();
-  const own = albumKey(title, artist);
-  if (own) keys.add(own);
-  const rec = listenLaterLibraryRecord(title, artist);
-  if (rec) {
-    const k = albumKey(rec.title, rec.subtitle);
-    if (k) keys.add(k);
-  }
-  return keys;
-}
-
-// The rows that name the album `title`/`artist`, compared in BOTH directions
-// (see listenLaterKeysFor).
-function listenLaterMatches(title, artist, rows) {
-  const want = listenLaterKeysFor(title, artist);
-  if (!want.size) return [];
-  return (rows || listenLaterRows()).filter(r => {
-    if (want.has(r.key)) return true;
-    const rec = listenLaterRecord(r);
-    return !!(rec && want.has(albumKey(rec.title, rec.subtitle)));
-  });
-}
-
-// Put an album aside. Returns true when it is on the list afterwards (whether
-// or not it already was), false when it could not be stored. Adding an album
-// already on the list keeps its original date: "newest first" means when it
-// was first put aside, and a second tap must not move it to the front.
-function listenLaterAdd(entry) {
-  if (!labelsDb || !entry) return false;
-  if (settingsStore.frozen()) return false;   // restarting after a restore: the list on disk is the restored one
-  const title  = String(entry.title || "").trim().slice(0, 300);
-  const artist = String(entry.artist || "").trim().slice(0, 300);
-  const key = albumKey(title, artist);
-  if (!key) return false;
-  if (listenLaterMatches(title, artist).length) return true;
-  const service = listenLaterServices().indexOf(entry.service) !== -1 ? entry.service : null;
-  const albumId = service && entry.album_id ? String(entry.album_id).slice(0, 64) : null;
-  // A cover URL is shown in an <img>, so only a plain http(s) address is kept.
-  const image = /^https?:\/\//i.test(String(entry.image || "")) ? String(entry.image).slice(0, 1000) : null;
-  const source = listenLaterSources().indexOf(entry.source) !== -1 ? entry.source : "album";
-  try {
-    const info = labelsDb.prepare(
-      "INSERT OR IGNORE INTO listen_later (key, title, artist, service, album_id, image, source, ts) " +
-      "VALUES (?,?,?,?,?,?,?,?)").run(key, title, artist, service, albumId, image, source, Date.now());
-    // Only a row actually written moves the revision: a spurious move makes
-    // every device re-read the row and both screens for nothing.
-    if (info.changes) laterVersion++;
-    return true;
-  } catch (e) {
-    console.error("[later] could not add " + JSON.stringify(title) + ": " + e.message);
-    return false;
-  }
-}
-
-// Take an album off the list — every row that names it, so an album put aside
-// twice under two spellings does not survive its own removal. Returns how many
-// rows went.
-function listenLaterRemove(title, artist) {
-  if (!labelsDb) return 0;
-  const rows = listenLaterMatches(title, artist);
-  if (!rows.length) return 0;
-  try {
-    const del = labelsDb.prepare("DELETE FROM listen_later WHERE key = ?");
-    labelsDb.transaction(() => { for (const r of rows) del.run(r.key); })();
-    laterVersion++;
-    return rows.length;
-  } catch (e) {
-    console.error("[later] could not remove " + JSON.stringify(title) + ": " + e.message);
-    return 0;
-  }
-}
-
-// "Not for me" on a Smart Pick means the artist, everywhere: every entry that
-// came from Smart Picks for them goes too — whether the build sent it here or
-// the pick's own "＋ Listen later" did, since both are the recommender's
-// suggestion. An album put aside from the album view (source "album") stays:
-// that was the user's own find, not a pick.
-function listenLaterForgetPickArtist(canon) {
-  if (!labelsDb || !canon) return 0;
-  let n = 0;
-  try {
-    const del = labelsDb.prepare("DELETE FROM listen_later WHERE key = ?");
-    for (const r of listenLaterRows()) {
-      if (r.source !== "picks") continue;
-      // The entry carries the SERVICE's credit, which can name the blocked act
-      // alongside others ("Khruangbin & Leon Bridges") — so any credited act
-      // counts, split the way albumKeys splits a credit.
-      const acts = [r.artist].concat(String(r.artist || "").split(/ \/ |\/| feat\.? | featuring | ft\.? |, | & | \+ /i));
-      if (acts.some(a => canonArtist(a) === canon) && del.run(r.key).changes) n++;
-    }
-    if (n) laterVersion++;
-  } catch (e) {
-    console.error("[later] could not drop picks by a blocked artist: " + e.message);
-  }
-  return n;
-}
-
-// The entries a day's Smart Picks put here, by the service album each names.
-// Called when that day's set is discarded and rebuilt.
-function listenLaterForgetPicksOfDay(day) {
-  if (!labelsDb) return 0;
-  try {
-    const info = labelsDb.prepare(
-      "DELETE FROM listen_later WHERE source = 'picks' AND album_id IS NOT NULL AND " +
-      "EXISTS (SELECT 1 FROM smart_picks p WHERE p.day = ? AND p.service = listen_later.service " +
-      "AND p.album_id = listen_later.album_id)").run(day);
-    if (info.changes) laterVersion++;
-    return info.changes;
-  } catch (e) {
-    console.error("[later] could not drop the discarded day's picks: " + e.message);
-    return 0;
-  }
-}
-
-// Has every track of the album filed under `akey` been played through, on an
-// album titled `albumTitle`, since `since`? False whenever it cannot be shown
-// to be true — including an album whose track list was never recorded.
-function listenLaterPlayedThrough(akey, albumTitle, since) {
-  if (!labelsDb || !akey) return false;
-  const tracks = labelsDb.prepare("SELECT n, tkey FROM album_tracks WHERE akey = ?").all(akey);
-  if (!tracks.length) return false;
-  const need = new Set(tracks.map(r => r.n));
-  const byKey = new Map();
-  for (const r of tracks) {
-    if (!byKey.has(r.tkey)) byKey.set(r.tkey, []);
-    byKey.get(r.tkey).push(r.n);
-  }
-  const wantAlbum = canonText(albumTitle);
-  // Narrowed in SQL to plays of this album title — Roon's own string on both
-  // sides (plays.album is the zone's line3, albumTitle is the snapshot's), so
-  // the exact comparison is the right one. This runs inside the zone handler,
-  // and without it every counted track would pull every play since the entry
-  // was added into JS. canonText below stays as the confirmation.
-  const plays = labelsDb.prepare(
-    "SELECT DISTINCT track, album FROM plays WHERE ts >= ? AND completed = 1 " +
-    "AND lower(trim(album)) = lower(trim(?))").all(since, String(albumTitle || ""));
-  for (const p of plays) {
-    if (canonText(p.album) !== wantAlbum) continue;
-    for (const k of trackTitleKeys(p.track)) {
-      for (const n of (byKey.get(k) || [])) need.delete(n);
-    }
-    if (!need.size) return true;
-  }
-  return false;
-}
-
-// Called when a play is counted. Only an album on the list whose title is the
-// one just played is examined, so the plays query runs only when it could
-// possibly end in a removal — not on every track of every evening.
-function listenLaterNoticePlay(albumTitle) {
-  if (!labelsDb || settingsStore.frozen()) return;   // frozen: restarting after a restore, the list on disk is the restored one
-  const want = canonText(albumTitle);
-  if (!want) return;
-  try {
-    const del = labelsDb.prepare("DELETE FROM listen_later WHERE key = ?");
-    for (const row of listenLaterRows()) {
-      const rec = listenLaterRecord(row);
-      const title = rec ? rec.title : row.title;
-      if (canonText(title) !== want) continue;
-      const akey = albumKey(title, rec ? rec.subtitle : row.artist);
-      if (!listenLaterPlayedThrough(akey, title, row.ts)) continue;
-      if (!del.run(row.key).changes) continue;
-      laterVersion++;
-      console.log("[later] " + JSON.stringify(title) + " played through — off the Listen later list");
-    }
-  } catch (e) {
-    // Logged, not thrown: this runs inside the zone-event handler, and a
-    // failure here must cost the list its tidy-up, never playback tracking.
-    console.error("[later] play check failed: " + e.message);
-  }
-}
-
-// Where a service-only entry can be opened, for listening before deciding.
-function listenLaterServiceUrl(service, albumId) {
-  if (!albumId) return null;
-  if (service === "qobuz") return qobuzDeep.deepLink(albumId);
-  if (service === "tidal") return "https://tidal.com/browse/album/" + encodeURIComponent(albumId);
-  return null;
-}
 
 // GET /api/qobuz-link — the Qobuz link that opens the Qobuz app (lib/routes/qobuz-link.js, moved out in v1.9.47).
 mountQobuzLink(app, { normalize: similar.normalize, shareLinks, qobuzDeep, qobuzWait, httpText, browserUA: BROWSER_UA, debug: DEBUG });
@@ -11687,8 +11055,6 @@ const SIMILAR_ACT_TTL_MS     = 7 * DAY_MS;   // an act's top tracks and albums
 const SIMILAR_SHOWN_TTL_MS   = 30 * DAY_MS;  // what was shown, per playing act
 const TASTE_SEED_DAYS = 180;                 // plays considered for the taste graph
 const TASTE_SEEDS     = 40;                  // acts whose related lists make it
-
-const deezerJson = (path) => httpJson("https://api.deezer.com/" + path);
 
 // The playing act's related acts, best first — or [] when Deezer does not know
 // them. Every candidate that carries the right name is tried, not just the
@@ -11751,35 +11117,24 @@ async function actRecords(act) {
  * The first share of a day is answered from yesterday's graph (or Deezer's
  * order, before there has been one) while it builds.
  */
-let tasteBuilt = null, tasteBuilding = null;
+// Each profile's, once a day on first asking (profiles.md §10.7, lib/smart-picks/daily.js); Guest's nobody's (§10.12).
+const tastes = createDaily({ day: () => smartDayKey(), build: (p) => buildTaste(p), log: (l) => console.warn("[taste] " + l) });
 function taste() {
-  if (!tasteBuilt || tasteBuilt.day !== smartDayKey()) buildTaste();
-  return tasteBuilt || { day: null, graph: new Map(), played: new Set(), heavy: new Set() };
+  const w = profiles.viewer();
+  const p = profiles.picksOf(w ? w.id : null);
+  return (p !== null && tastes.get(p)) || { day: null, graph: new Map(), played: new Set(), heavy: new Set() };
 }
-function buildTaste() {
-  if (tasteBuilding) return tasteBuilding;
-  tasteBuilding = (async () => {
-    let rows = [];
-    if (labelsDb) {
-      rows = labelsDb.prepare("SELECT artist, ts FROM plays WHERE ts >= ? AND artist != ''")
-        .all(Date.now() - TASTE_SEED_DAYS * DAY_MS);
-    }
-    const all = newRel.playedArtists(rows, { split: shareLinks.primaryArtist, limit: Infinity });
-    const seeds = all.slice(0, TASTE_SEEDS);
-    const rel = new Map();
-    for (const seed of seeds) rel.set(seed.name, await relatedPool(seed.name, "seed"));
-    // The acts played most — five or more days — need no introduction.
-    const heavy = new Set(seeds.filter(x => x.days >= 5).slice(0, 5).map(x => similar.normalize(x.name)));
-    tasteBuilt = {
-      day: smartDayKey(),
-      graph: similar.tasteGraph(seeds, n => rel.get(n)),
-      played: new Set(all.map(x => similar.normalize(x.name))),
-      heavy,
-    };
-    if (seeds.length) console.log("[taste] " + tasteBuilt.graph.size + " acts near the " + seeds.length + " you play");
-  })().catch(e => console.warn("[taste] " + e.message))
-      .finally(() => { tasteBuilding = null; });
-  return tasteBuilding;
+async function buildTaste(profile) {
+  const rows = labelsDb ? listening.playedArtistRows(Date.now() - TASTE_SEED_DAYS * DAY_MS, profiles.who(profile)) : [];   // tracks played (95%)
+  const all = newRel.playedArtists(rows, { split: shareLinks.primaryArtist, limit: Infinity });
+  const seeds = all.slice(0, TASTE_SEEDS);
+  const rel = new Map();
+  for (const seed of seeds) rel.set(seed.name, await relatedPool(seed.name, "seed"));
+  // The acts played most — five or more days — need no introduction.
+  const heavy = new Set(seeds.filter(x => x.days >= 5).slice(0, 5).map(x => similar.normalize(x.name)));
+  const built = { day: smartDayKey(), graph: similar.tasteGraph(seeds, n => rel.get(n)), played: new Set(all.map(x => similar.normalize(x.name))), heavy };
+  if (seeds.length) console.log("[taste] " + built.graph.size + " acts near the " + seeds.length + " profile " + profile + " plays");
+  return built;
 }
 
 // The library's albums by an act, by credited name — EXACT, once normalised
@@ -12090,17 +11445,9 @@ function discoverOwnedFor(seedName, ownedRows) {
 // the rule that knows "Hall & Oates" is one act lives in exactly one place.
 function discoverSeeds() {
   if (!labelsDb) return [];
-  let rows = [];
-  try {
-    const cutoff = Date.now() - discoverSeedDays() * 24 * 60 * 60 * 1000;
-    rows = labelsDb.prepare(
-      "SELECT artist, ts FROM plays WHERE ts >= ? AND artist != ''").all(cutoff);
-  } catch (e) {
-    // No plays table yet, or it could not be read. An empty seed list is a
-    // build that produces nothing, which is the honest answer — not an error.
-    if (DEBUG) console.error("[discover] seeds: " + e.message);
-    return [];
-  }
+  // Tracks played (95%, 2.0.6-t20). No plays table yet, or one that could not be read, gives no rows: an empty seed
+  // list is a build that produces nothing, which is the honest answer — not an error.
+  const rows = listening.playedArtistRows(Date.now() - discoverSeedDays() * 24 * 60 * 60 * 1000);
   return newRel.playedArtists(rows, {
     split: shareLinks.primaryArtist, limit: discoverSeedCount(),
   });
@@ -12469,15 +11816,11 @@ app.post("/api/settings/discover", (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// Plugins (v1.9.19, dev/design/plugins.md): features Rouen can be without,
-// run only while switched on. HQPlayer (v1.8.74): /api/hqp/*, all in lib/hqp/,
-// its presets and learned failures kept on the data volume beside the rest.
+// Plugins (v1.9.19, dev/design/plugins.md): features Rouen can be without, run only while switched on, each keeping
+// its data on the data volume beside the rest (lib/plugins-mount.js).
 // ---------------------------------------------------------------------------
-const plugins = createPluginHost({ getSettings: () => loadPersistedSettings(),
-  saveSettings: (patch) => savePersistedSettings(patch), log: (line) => { console.log("[plugins] " + line); } });
-plugins.register(hqpPlugin({ dataDir: path.join(__dirname, "data"), getSettings: () => loadPersistedSettings(),
-  saveSettings: (patch) => savePersistedSettings(patch), zones: () => zones }));
-plugins.mount(app);
+mountPlugins(app, { dataDir: path.join(__dirname, "data"), loadPersistedSettings, savePersistedSettings, zones: () => zones,
+  version: pkg.version });
 
 // Home screen rows — which appear, and in what order: lib/routes/home-rows.js (moved out in v1.9.67).
 mountHomeRows(app, { load: loadPersistedSettings, save: savePersistedSettings,
@@ -12794,55 +12137,6 @@ mountAlbumCredits(app, albumCredits);
 mountArtists(app, { ready: isIndexBuilt, stamp: () => liveRevisions().library, albums: () => albumIndex.albums, ensure: (al) => { if (al.cArtist === undefined) applyCreditIdentities(al); },
   leadOf: (credit) => splitCreditIntoArtists(credit)[0] || "", nameKey: canonArtist, photos: () => albumCredits.store.photos(), acts: albumCredits.acts });
 
-// Rebuild today's picks now, ignoring the schedule and the attempt marker.
-// The button somebody presses when they want to see it work.
-app.post("/api/smart-picks/rebuild", (req, res) => {
-  if (!core) return res.status(503).json({ error: "Not paired with Roon Core yet" });
-  const day = smartDayKey();
-  try {
-    if (labelsDb) {
-      // With picks sent to Listen later, the set being discarded was put there
-      // too; leaving it would stack a fresh five on top at every Rebuild, with
-      // the old ones no longer on the Smart Picks screen to say "Not for me" to.
-      if (smartPicksDest === "later") listenLaterForgetPicksOfDay(day);
-      labelsDb.prepare("DELETE FROM smart_picks WHERE day = ?").run(day);
-      labelsDb.prepare("DELETE FROM smart_cache WHERE key = ?").run(smartAttemptKey(day));
-      picksVersion++;   // the day's set is gone until the rebuild lands
-    }
-  } catch (e) {
-    return res.status(500).json({ error: e.message });
-  }
-  kickSmartPicks("manual", true);   // the button means now, schedule or not
-  res.json({ ok: true, building: !!_smartBuilding });
-});
-
-// POST /api/smart-picks/block { artist } — "not for me", permanently.
-//
-// Only an explicit tap blocks an artist. Ignoring a pick must NOT count as a
-// rejection: the whole premise is albums the user would never reach for, so a
-// model that read silence as "no" would suppress the entire feature within a
-// week.
-app.post("/api/smart-picks/block", (req, res) => {
-  const artist = String((req.body && req.body.artist) || "").trim();
-  if (!artist) return res.status(400).json({ error: "artist required" });
-  const canon = canonArtist(artist);
-  if (!canon) return res.status(400).json({ error: "unrecognisable artist name" });
-  if (!labelsDb || !stmtInsertSmartBlock) {
-    return res.status(503).json({ error: "History database unavailable" });
-  }
-  try {
-    stmtInsertSmartBlock.run(canon, artist, Date.now());
-    // Drop it from today's set too, so it disappears on refresh instead of
-    // sitting there until tomorrow's build.
-    labelsDb.prepare("DELETE FROM smart_picks WHERE canon = ?").run(canon);
-    picksVersion++;   // gone from the Home row on every device, not just this one
-    listenLaterForgetPickArtist(canon);   // and the picks of theirs sent to Listen later
-    res.json({ ok: true, artist });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
 // ---------------------------------------------------------------------------
 // Library search (instant, prefix-aware, typo-tolerant — see albumIndex above)
 // ---------------------------------------------------------------------------
@@ -12947,47 +12241,12 @@ function backupLive() {
     version: pkg.version,
     settings: loadPersistedSettings(),
     userPlaylists,
-    later: listenLaterRows(),
+    later: listenLaterRows(), laterTags: labelsDb ? laterOwners.exportAll() : [], profiles: labelsDb ? profiles.store.exportAll() : null,   // 2.0.7-t2, -t5
     files,
   };
 }
 
-// The Listen later part, put back. The key is worked out again from title and
-// artist rather than taken from the file, so a backup made by a build that
-// keyed albums differently still lands where today's lookups will look.
-function backupRestoreLater(rows) {
-  if (!labelsDb) throw new Error("The database is not available");
-  const ins = labelsDb.prepare(
-    "INSERT OR IGNORE INTO listen_later (key, title, artist, service, album_id, image, source, ts) " +
-    "VALUES (?,?,?,?,?,?,?,?)");
-  labelsDb.transaction(() => {
-    labelsDb.prepare("DELETE FROM listen_later").run();
-    for (const r of rows) {
-      if (!r || typeof r !== "object") continue;
-      const title  = String(r.title || "").trim().slice(0, 300);
-      const artist = String(r.artist || "").trim().slice(0, 300);
-      const key = albumKey(title, artist);
-      if (!key) continue;
-      const service = listenLaterServices().indexOf(r.service) !== -1 ? r.service : null;
-      const albumId = service && r.album_id ? String(r.album_id).slice(0, 64) : null;
-      const image = /^https?:\/\//i.test(String(r.image || "")) ? String(r.image).slice(0, 1000) : null;
-      const source = listenLaterSources().indexOf(r.source) !== -1 ? r.source : "album";
-      const ts = Number.isFinite(Number(r.ts)) && Number(r.ts) > 0 ? Math.floor(Number(r.ts)) : Date.now();
-      ins.run(key, title, artist, service, albumId, image, source, ts);
-    }
-  })();
-  laterVersion++;
-}
-
-// Atomic and LOUD: writeJsonAtomic logs a failure and carries on, which is
-// right for a cache and wrong here — a restore that could not write a file
-// must not report success.
-function backupWriteJson(file, value) {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const tmp = file + ".tmp";
-  fs.writeFileSync(tmp, JSON.stringify(value, null, 2));
-  fs.renameSync(tmp, file);
-}
+const backupWriteJson = BACKUP.writeJsonLoud;   // a restore's files, whole or throwing (lib/backup.js, moved out in 2.0.7-t2)
 
 // Applies the plan step by step. `state.changed` says whether anything on disk
 // was replaced before a step failed: the route restarts either way once it is
@@ -13006,7 +12265,9 @@ function backupApply(b, parts, state) {
   for (const k of Object.keys(cur)) delete cur[k];
   Object.assign(cur, p.settings);
   settingsStore.bump();
-  if (p.later) backupRestoreLater(p.later);
+  if (p.later) laterStore.restore(p.later);   // lib/listen-later/store.js
+  if (p.profiles) { if (!labelsDb) throw new Error("The database is not available"); profiles.store.restoreAll(p.profiles); }
+  if (p.laterTags) laterOwners.restoreAll(p.laterTags, (id) => !!profiles.store.get(id));   // after the profiles: none naming one not here
   if (p.userPlaylists) {
     userPlaylists = p.userPlaylists.map(userPlaylistRecord).filter(Boolean).slice(0, userPlMax());
     backupWriteJson(USER_PL_FILE, { v: userPlVersion(), playlists: userPlaylists });
@@ -13482,82 +12743,21 @@ function cancelRadioRecheck(zid) {
 }
 
 // ---------------------------------------------------------------------------
-// Scrobble / play tracking — records plays into SQLite for stats.
+// Plays: every zone push recorded, and what counts as a play (lib/listening/, moved out of here in 2.0.6-t20).
 // ---------------------------------------------------------------------------
-function scrobbleUpdate(z) {
-  // NOT behind the labelsDb guard below. The queue history is in-memory and has
-  // nothing to do with the scrobble database — gating it on that would mean a
-  // zone with no database silently lost its history too.
-  const np    = z && z.now_playing;
-  const state = z && z.state;
-  const zid   = z && z.zone_id;
-  if (!zid) return;
-
-  // Roon nests now_playing text in three_line / one_line sub-objects.
-  const tl    = (np && np.three_line) || {};
-  const ol    = (np && np.one_line)   || {};
-  const track  = tl.line1 || ol.line1 || "";
-  const artist = tl.line2 || "";
-  const album  = tl.line3 || "";
-
-  const prev = scrobbleState.get(zid);
-  // The plays table is optional — a container with no writable data volume
-  // still plays music. The queue history above is not gated on it.
-  const dbOn = !!(labelsDb && stmtInsertPlay && stmtCompletePlay);
-
-  if (state === "playing" && np && track) {
-    if (!prev || prev.track !== track || prev.album !== album) {
-      // The outgoing track has just left the queue, and Roon will never report
-      // it again — this transition is the only moment it and its elapsed time
-      // are both known. Recorded before anything below can touch `prev`.
-      if (prev) {
-        const entry = historyEntry(prev, Date.now());
-        if (entry) zoneHistory.set(zid, pushHistory(zoneHistory.get(zid), entry));
-      }
-      // New track — complete previous if it qualifies
-      if (dbOn && prev && prev.playId && playCounted(prev)) {
-        try { stmtCompletePlay.run(prev.playId); } catch (e) {} // scrobble DB optional — playback continues regardless
-        listenLaterNoticePlay(prev.album);   // played through? off the Listen later list
-      }
-      // Insert new play record
-      let playId = null;
-      if (dbOn) {
-        try {
-          const info = stmtInsertPlay.run(
-            Date.now(), z.display_name || zid,
-            track, artist, album,
-            np.image_key || "", np.length || 0
-          );
-          playId = info.lastInsertRowid;
-          playsVersion++;   // Recently played, Not played and the play sorts all read this row
-        } catch (e) {} // scrobble DB optional — null playId is handled below
-      }
-      scrobbleState.set(zid, {
-        track, artist, album,
-        image_key: np.image_key || "", duration: np.length || 0,
-        playId, elapsed: 0, lastSeekPos: np.seek_position || 0
-      });
-    } else if (prev) {
-      // Same track — accumulate elapsed via seek_position delta
-      const seekDelta = (np.seek_position || 0) - prev.lastSeekPos;
-      if (seekDelta > 0 && seekDelta < 30) prev.elapsed += seekDelta;
-      prev.lastSeekPos = np.seek_position || 0;
-    }
-  } else if (prev && prev.playId) {
-    // Not playing (paused/stopped) — finalise if eligible.
-    //
-    // Deliberately NOT a history departure. Pausing clears this state and
-    // resuming rebuilds it, so recording here would file the track you are
-    // still listening to as "played earlier" every time you paused it. A
-    // genuine track change is the only departure, which is why the only push
-    // is in the branch above.
-    if (dbOn && playCounted(prev)) {
-      try { stmtCompletePlay.run(prev.playId); } catch (e) {} // scrobble DB optional — playback continues regardless
-      listenLaterNoticePlay(prev.album);   // played through? off the Listen later list
-    }
-    scrobbleState.delete(zid);
-  }
-}
+// A library album's identity for its plays (lib/listening/listening.js).
+function listenKey(al) { return listening.listenKey(al); }
+// The library the plays are matched against, as the screens read it, and what changes when it does.
+function libraryAlbumsNow() { return albumIndex.albums; }
+function libraryVersionNow() { return albumIndex.builtAt; }
+// A play was recorded or finished, or an album played: Recently played, Not played and the play sorts all read them.
+function playsChanged() { playsVersion++; }
+function scrobbleUpdate(z) { listening.update(z); }
+// A zone gone, or the Core: what was playing there is over, and counted as far as it was heard.
+function scrobbleZoneGone(zid) { listening.zoneGone(zid); profiles.forget(zid); }
+function scrobbleReset() { listening.reset(); }
+// The library changed: plays' albums named against it, and the history read once (lib/listening/listening.js).
+function listeningLibraryChanged() { listening.libraryChanged(); }
 
 app.get("/api/radio", (req, res) => {
   const zoneId = req.query.zone;
@@ -13618,6 +12818,7 @@ app.post("/api/radio", (req, res) => {
 // An album's extras and its stored release date, each extras answer timed for the share card's log:
 // lib/routes/album-extras.js (moved out in v2.0.3-t5).
 mountAlbumExtras(app, { normalize, lookUpAlbumDay, fetchAlbumYear, fetchAlbumBios, notePageYear, storedReleaseDate,
+  roonYearOf: (k) => (albumYearSource.get(k) === "roon" && albumYearCache.get(k)) || null,
   albumReleaseOf, labelDiskCache, TYPE_NAMES, ALBUM_PAGE_DAY_WAIT_MS, loadPersistedSettings, enabledServices,
   enabledReviews, shareLinks, trace: shareTrace });
 
@@ -14305,77 +13506,9 @@ app.get("/api/album/now-playing", async (req, res) => {
   }
 });
 
-// Queue for a zone
-// RoonApiTransport doesn't expose a one-shot get_queue — only subscribe_queue.
-// We subscribe, respond on the first "Subscribed" payload, then immediately
-// unsubscribe via the handle node-roon-api returns. The old version skipped
-// the unsubscribe, so every queue-modal open left one live subscription the
-// Core kept pushing deltas to for the life of the process — an unbounded,
-// extension-induced load on the Core.
-app.get("/api/queue", (req, res) => {
-  if (!core) return res.status(503).json({ error: "Not paired with Roon Core" });
-  const zoneId = req.query.zone;
-  if (!zoneId) return res.status(400).json({ error: "zone required" });
-
-  let responded = false;
-  let sub = null;
-  // Respond exactly once, then drop the subscription. Also runs on timeout,
-  // so a slow "Subscribed" that arrives after 504 still gets unsubscribed.
-  const finish = (send) => {
-    if (responded) return;
-    responded = true;
-    clearTimeout(timeout);
-    send();
-    if (sub) {
-      try { sub.unsubscribe(() => {}); }
-      catch (e) { /* socket already gone — the subscription died with it */ }
-    }
-  };
-  const timeout = setTimeout(() => {
-    finish(() => res.status(504).json({ error: "queue subscription timed out" }));
-  }, 5000);
-
-  try {
-    sub = core.services.RoonApiTransport.subscribe_queue(zoneId, 100, (response, msg) => {
-      if (response === "Subscribed") {
-        finish(() => {
-          const items = ((msg && msg.items) || []).map(it => ({
-            queue_item_id: it.queue_item_id,
-            // three_line FIRST. Roon's one_line.line1 is "Track - Artist" all
-            // in one string, and the row already prints the artist underneath
-            // as its subtitle — so it read "The Artist - Big Big Train" over
-            // "Big Big Train". The played-earlier rows come from the zone push,
-            // which is three_line, so the two halves of the same list also
-            // disagreed about how to write a track down.
-            title:    (it.three_line && it.three_line.line1) || (it.one_line && it.one_line.line1) || "",
-            subtitle: (it.three_line && it.three_line.line2) || "",
-            image_key: it.image_key || null,
-            length:    it.length || null
-          }));
-          // What this zone already played, newest first, alongside the live
-          // queue so the screen needs one fetch. Roon cannot supply it — see
-          // lib/queue-history.js — so it comes from what we watched leave.
-          // Capped well below the ring: this is a fold-out, not an archive,
-          // and it rides on a response the queue screen opens constantly.
-          res.json({ items, history: recentHistory(zoneHistory.get(zoneId), 50) });
-        });
-      } else if (response && response !== "Changed" && response !== "Unsubscribed") {
-        // An error name (e.g. "NetworkError") instead of a payload — fail fast
-        // rather than waiting out the 5 s timeout.
-        finish(() => res.status(502).json({ error: "queue subscription failed: " + response }));
-      }
-    });
-    // If the first response was delivered synchronously (inside the
-    // subscribe_queue call itself), finish() ran while `sub` was still null
-    // and couldn't unsubscribe — catch up now that the handle exists.
-    if (responded && sub) {
-      try { sub.unsubscribe(() => {}); }
-      catch (e) { /* socket already gone — the subscription died with it */ }
-    }
-  } catch (e) {
-    finish(() => res.status(500).json({ error: e.message || String(e) }));
-  }
-});
+// GET /api/queue (lib/routes/queue.js, moved out in 2.0.6-t2): a zone's queue, and what it already played (capped at
+// 50: lib/queue-history.js).
+mountQueue(app, { core: () => core, history: (zoneId) => recentHistory(zoneHistory.get(zoneId), 50) });
 
 
 // Playing, seeking and volume (lib/routes/transport.js, moved out in v1.9.65): through your server itself with native
@@ -14490,66 +13623,9 @@ function roonErrorPayload(err) {
 //                    standby. This is the documented behaviour of standby()
 //                    with control_key omitted, and is how "all off" works.
 const STANDBY_MODES = ["toggle", "standby"];
-app.post("/api/output/standby", (req, res) => {
-  if (!core) return res.status(503).json({ error: "Not paired with Roon Core" });
-  const { output_id, control_key } = req.body || {};
-  const mode = (req.body && req.body.mode) || "toggle";
-  if (!output_id) return res.status(400).json({ error: "output_id required" });
-  if (!STANDBY_MODES.includes(mode)) {
-    return res.status(400).json({ error: "invalid mode, allowed: " + STANDBY_MODES.join(", ") });
-  }
-  if (mode === "toggle" && !control_key) {
-    return res.status(400).json({ error: "control_key required for mode=toggle" });
-  }
-  if (control_key !== undefined && typeof control_key !== "string") {
-    return res.status(400).json({ error: "control_key must be a string" });
-  }
-
-  const t = core.services.RoonApiTransport;
-  const name = (outputs[output_id] && outputs[output_id].display_name) || output_id;
-  const opts = control_key ? { control_key } : {};
-  console.log(`[standby] ${mode} ${name}${control_key ? " (" + control_key + ")" : ""}`);
-  // On a not-found, dump what the Core actually told us about this output's
-  // controls — the only way to see the real key shape, and exactly the moment it
-  // matters. `alreadyDumped` keeps a failure that was dumped before a retry
-  // decision from printing the same block twice.
-  const dumpControls = () => {
-    console.warn("[standby] core reported source_controls:",
-                 JSON.stringify((outputs[output_id] || {}).source_controls || null));
-  };
-  const fail = (err, alreadyDumped) => {
-    const raw = typeof err === "string" ? err : JSON.stringify(err);
-    console.warn(`[standby] failed: ${raw}`);
-    if (!alreadyDumped && raw === "SourceControlNotFound") dumpControls();
-    res.status(500).json(roonErrorPayload(err));
-  };
-
-  if (mode !== "toggle") {
-    return t.standby(output_id, opts, (err) => err ? fail(err) : res.json({ ok: true }));
-  }
-
-  // Keyed toggle first. In production this is the path that works — a WiiM's
-  // device-provided control accepts keyed toggle_standby with the very key it
-  // refuses for convenience_switch, so the two calls resolve differently inside
-  // the Core. The fallback below is cover for devices where it doesn't, not a
-  // workaround for an observed failure on this one.
-  t.toggle_standby(output_id, opts, (err) => {
-    if (!err) return res.json({ ok: true, form: "toggle-keyed" });
-    const raw = typeof err === "string" ? err : JSON.stringify(err);
-    const notFound = raw === "SourceControlNotFound";
-    if (notFound) dumpControls();
-    if (!shouldRetryKeyless(raw, true)) return fail(err, notFound);
-
-    const status = controlStatusOf(outputs[output_id], control_key);
-    const want = keylessStandbyFallback(status);
-    console.warn(`[standby] keyed toggle refused; status=${status || "unknown"} fallback=${want || "none"}`);
-    if (!want) return fail(err, notFound);
-
-    const after = (e2) => e2 ? fail(e2) : res.json({ ok: true, form: "keyless-" + want });
-    if (want === "wake") t.convenience_switch(output_id, {}, after);
-    else                 t.standby(output_id, {}, after);
-  });
-});
+// POST /api/output/standby (lib/routes/output-standby.js, moved out in Rouen Lite's L1): a device's standby.
+mountOutputStandby(app, { core: () => core, outputs: () => outputs, modes: STANDBY_MODES, roonErrorPayload, shouldRetryKeyless,
+  controlStatusOf, keylessStandbyFallback });
 
 // Switch a device's input to Roon, waking it from standby if needed.
 // body: { output_id, control_key? } — control_key omitted switches every
@@ -14771,10 +13847,10 @@ async function pickUnheardAlbum() {
   let pick = null;
   if (labelsDb) {
     const cutoff = Date.now() - UNHEARD_MONTHS * 30 * 24 * 60 * 60 * 1000;
-    const heard = getPlayedTitlesSince(cutoff);
+    const heard = playedAlbumKeysSince(cutoff, profiles.viewer());
     for (let attempt = 0; attempt < 10 && !pick; attempt++) {
       const candidates = (await pickRandomAlbums(10)).albums;
-      const fresh = candidates.filter(a => !heard.has((a.title || "").toLowerCase().trim()));
+      const fresh = candidates.filter(a => !heard.has(listenKey(a)));
       if (fresh.length) pick = fresh[0];
     }
   }

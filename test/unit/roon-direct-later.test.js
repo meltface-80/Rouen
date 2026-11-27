@@ -15,6 +15,7 @@ const { createStage1 } = require("../../lib/roon-direct/stage1");
 const { createLink } = require("../../lib/roon-direct/link");
 const { readAlbumsOn } = require("../../lib/roon-direct/albums");
 const { createLater, entriesOf } = require("../../lib/roon-direct/later");
+const { setHousehold, NOBODY, WHY_NOBODY } = require("../../lib/roon-direct/session");
 const { startFakeCore } = require("../lib/fake-roon-core");
 const { dotnetGuidBytes } = require("../../lib/roon-direct/brokerid");
 const { CORE_ID, LIBRARY, assertTidy } = require("../lib/roon-direct-fixtures");
@@ -38,23 +39,27 @@ async function rig(t, faults, o = {}) {
   const listenLater = (o.later || [{ catalog: 0 }, { library: 2 }]).map((x) => Object.assign({}, x));
   const core = await startFakeCore({ brokerId: dotnetGuidBytes(CORE_ID), albums, catalog: CATALOG, listenLater,
     faults: Object.assign({ sentOnce: true }, faults) });
+  // The household's Roon profile (profiles.md §13.2): Rouen's first profile's pairing.
+  if (o.profile) { setHousehold(() => /** @type {string} */ (o.profile)); t.after(() => setHousehold(() => null)); }
   let s1 = null;
   const reads = [];
   let changes = 0;
   const link = createLink({ core: () => ({ host: "127.0.0.1", coreId: CORE_ID }), port: core.port, timeoutMs: 1500,
     settleMs: 800, retryFirstMs: 100, onUp: () => s1.linkUp() });
   s1 = createStage1({
-    settings: { load: () => (o.profile ? { on: false, profile: o.profile } : null), save() {} }, cache: { read: () => null, write() {}, remove() {} },
+    settings: { load: () => null, save() {} }, cache: { read: () => null, write() {}, remove() {} },
     core: () => ({ host: "127.0.0.1", coreId: CORE_ID, coreVersion: "2.0" }), rouenVersion: "1.9.45",
     records: () => [], keyOf: o.keyOf || keyOf, link, minGapMs: 0, onLaterChange: () => { changes++; },
     read: async (s, ro) => { const r = await readAlbumsOn(s, Object.assign({ timeoutMs: 1000 }, ro)); reads.push(r.ok); return r; },
+    requestProfile: o.requestProfile,
   });
   t.after(async () => { s1.turnOff(); await core.close(); });
-  if (o.off) return { core, s1, link, listenLater };
+  // Off: native mode is always on since 2.0.6-t21 (roon-native.md §11); off is the one-time choice's No.
+  if (o.off) { s1.turnOff(); return { core, s1, link, listenLater }; }
   s1.turnOn();
   assert.ok(await until(() => reads.length >= 1 && s1.albums()), "the library was never read");
   // later.js with short waits, on the same connection (a test sends nothing else at the same time).
-  const quick = createLater({ reader: s1.later, link, inTurn: (fn) => fn(), on: () => true, profile: () => null, albums: () => s1.albums(),
+  const quick = createLater({ reader: s1.later, link, inTurn: (fn) => fn(), on: () => true, profile: o.requestProfile ? () => s1.actingFor() : () => null, chosen: () => (o.profile || null), albums: () => s1.albums(),
     finder: s1.finder, keyOf: o.keyOf || keyOf, confirmMs: 300, pollMs: 50 });
   return { core, s1, link, listenLater, quick, changes: () => changes };
 }
@@ -71,11 +76,11 @@ test("THE one for N2c-2: Roon's list read; a library album and a catalogue album
   assert.equal(l.has({ title: "Dummy", artist: "Portishead" }), false);
 
   // A library album: named by the AlbumId the library read keeps, no search.
-  assert.deepEqual(await l.set({ title: "Dummy", artist: "Portishead" }, true), { ok: true, on: true });
+  assert.deepEqual(await l.set({ title: "Dummy", artist: "Portishead" }, true), { ok: true, on: true, albumId: LIB_ID(3) });
   // A catalogue album: found by your server's search (the copy on the service asked, else the other's).
-  assert.deepEqual(await l.set({ title: "Homogenic", artist: "Björk", service: "tidal" }, true), { ok: true, on: true });
+  assert.deepEqual(await l.set({ title: "Homogenic", artist: "Björk", service: "tidal" }, true), { ok: true, on: true, albumId: CAT_ID(1) });
   // Taken off: by the id Roon's list gave it.
-  assert.deepEqual(await l.set({ title: "Mezzanine", artist: "Massive Attack" }, false), { ok: true, on: false });
+  assert.deepEqual(await l.set({ title: "Mezzanine", artist: "Massive Attack" }, false), { ok: true, on: false, albumId: LIB_ID(2) });
   assert.deepEqual(w.core.rec.laterSets, [
     { profile: "cafebabe", albums: [LIB_ID(3)], state: 1 },
     { profile: "cafebabe", albums: [CAT_ID(1)], state: 1 },
@@ -90,7 +95,7 @@ test("THE one for N2c-2: Roon's list read; a library album and a catalogue album
   assertTidy(w.core.rec);
 });
 
-test("not sent — said, for today's way: not found, no id, refused, several profiles and none chosen; native mode off: nothing to say", async (t) => {
+test("not sent — said, for today's way: not found, no id, refused, several profiles and Rouen's first paired with none, a device with none; native mode off: nothing to say", async (t) => {
   const w = await rig(t);
   assert.match((await w.s1.listenLater.set({ title: "Nothing Like It", artist: "Nobody" }, true)).notSent, /didn't find this album on TIDAL or Qobuz/);
   assert.match((await w.s1.listenLater.set({ title: "Kid A", artist: "Radiohead", service: "tidal" }, true)).notSent, /not with the id/);
@@ -98,8 +103,12 @@ test("not sent — said, for today's way: not found, no id, refused, several pro
   const refused = await rig(t, { refuseLaterSet: true });
   assert.match((await refused.s1.listenLater.set({ title: "Dummy", artist: "Portishead" }, true)).notSent, /refused it \("Refused"\)/);
   const two = await rig(t, { twoProfiles: true });
-  assert.match((await two.s1.listenLater.set({ title: "Dummy", artist: "Portishead" }, true)).notSent, /Choose your profile/);
+  assert.match((await two.s1.listenLater.set({ title: "Dummy", artist: "Portishead" }, true)).notSent, /^Pair Rouen's first profile/);
   assert.deepEqual(two.core.rec.laterSets, []);
+  // §13.2: a device with no Roon profile of its own (Guest, unpaired) puts nothing on anyone's list, on a server of one too.
+  const none = await rig(t, {}, { requestProfile: () => NOBODY });
+  assert.equal((await none.s1.listenLater.set({ title: "Dummy", artist: "Portishead" }, true)).notSent, WHY_NOBODY);
+  assert.deepEqual(none.core.rec.laterSets, [], "put on the household's list for a device with none");
   const off = await rig(t, {}, { off: true });
   assert.deepEqual(await off.s1.listenLater.set({ title: "Dummy", artist: "Portishead" }, true), { off: true });
   assert.equal(off.s1.listenLater.has({ title: "Dummy", artist: "Portishead" }), null, "native mode off: Rouen's own list says");
@@ -195,10 +204,56 @@ test("a read that throws, or answers with no list: not read, never a rejection; 
 test("an album whose title Rouen's key can't name: searched for, put on Roon's list, found there, taken off", async (t) => {
   assert.equal(albumKey("+", "Ed Sheeran"), null, "precondition");
   const w = await rig(t, {}, { keyOf: albumKey, later: [] });
-  assert.deepEqual(await w.s1.listenLater.set({ title: "+", artist: "Ed Sheeran", service: "tidal" }, true), { ok: true, on: true });
+  assert.deepEqual(await w.s1.listenLater.set({ title: "+", artist: "Ed Sheeran", service: "tidal" }, true), { ok: true, on: true, albumId: CAT_ID(3) });
   assert.deepEqual(w.core.rec.laterSets.map((x) => [x.albums, x.state]), [[[CAT_ID(3)], 1]]);
   assert.equal(w.s1.listenLater.has({ title: "+", artist: "ed sheeran" }), true, "case aside");
   assert.equal(w.s1.listenLater.has({ title: "×", artist: "Ed Sheeran" }), false, "another title Rouen's key can't name taken for it");
-  assert.deepEqual(await w.s1.listenLater.set({ title: "+", artist: "Ed Sheeran" }, false), { ok: true, on: false });
+  assert.deepEqual(await w.s1.listenLater.set({ title: "+", artist: "Ed Sheeran" }, false), { ok: true, on: false, albumId: CAT_ID(3) });
   assert.deepEqual(w.core.rec.laterSets.map((x) => [x.albums, x.state]), [[[CAT_ID(3)], 1], [[CAT_ID(3)], 0]]);
+});
+
+// 2.0.7-t4 (profiles.md §5): a device linked to another Roon profile reads that profile's Listen later, and each
+// profile's list is kept apart, so one device's read never stands in for another's.
+test("P2: each Roon profile's Listen later is read for it and kept apart", async (t) => {
+  let acting = null;
+  const w = await rig(t, { twoProfiles: true }, { profile: "cafebabe", requestProfile: () => acting });
+  const asks = () => w.core.rec.laterAsks.map((a) => a.profile);
+  assert.ok("entries" in await w.quick.list());
+  const owner = asks().at(-1);
+  acting = "deadbeef";
+  assert.ok("entries" in await w.quick.list());
+  assert.equal(asks().length, 2, "the chosen profile's list stood in for the linked device's");
+  assert.notEqual(asks().at(-1), owner, "read for the chosen profile, not the device's");
+  acting = null;
+  assert.ok("entries" in await w.quick.list());
+  acting = "deadbeef";
+  assert.ok("entries" in await w.quick.list());
+  assert.equal(asks().length, 2, "a profile's fresh list was read again: one cache for all");
+});
+
+test("P2, the review: a linked device's Listen later is read the first time the album view asks, not left to Rouen's own", async (t) => {
+  // As the app runs it: the device's Roon profile carried by its request (lib/profiles/context.js), whatever runs after.
+  const { asDevice, deviceRoon } = require("../../lib/profiles/context");
+  const w = await rig(t, { twoProfiles: true }, { profile: "cafebabe", requestProfile: deviceRoon });
+  const mezz = { title: "Mezzanine", artist: "Massive Attack" };
+  const asks = () => w.core.rec.laterAsks.map((a) => a.profile);
+  const before = asks().length;
+  assert.equal(asDevice("deadbeef", () => w.quick.has(mezz)), null, "nothing read yet: nothing to say");
+  assert.ok(await until(() => asks().length > before), "THE one: never read, so Rouen's own list answered for good");
+  assert.ok(await until(() => asDevice("deadbeef", () => w.quick.has(mezz)) !== null));
+  assert.deepEqual(asks().slice(before), ["12"], "read for another profile than the device's");
+  w.quick.has(mezz);
+  await new Promise((r) => { setTimeout(r, 100); });
+  assert.deepEqual(asks().slice(before), ["12"], "the household's list read from the album view: the route's timer keeps it, as before");
+});
+
+test("§13.2, the review: a device with no Roon profile asks for no read of Roon's list — each would hold the reader every profile shares", async () => {
+  let reads = 0;
+  const reader = { async read() { reads++; return { read: true, complete: true, list: { items: [] } }; } };
+  const later = createLater({ reader, link: { session: () => ({}) }, inTurn: (fn) => fn(), on: () => true, profile: () => NOBODY, chosen: () => null,
+    albums: () => null, finder: /** @type {any} */ ({}), keyOf, confirmMs: 0, pollMs: 1 });
+  assert.deepEqual(await later.list(), { notRead: WHY_NOBODY });
+  assert.equal(later.entryOf({ title: "Dummy", artist: "Portishead" }), null);
+  await new Promise((r) => { setTimeout(r, 20); });
+  assert.equal(reads, 0, "THE one: a read asked for a device with none");
 });

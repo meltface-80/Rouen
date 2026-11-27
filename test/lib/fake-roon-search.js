@@ -78,7 +78,8 @@ function handleSearch(c) {
   c.rec.searches.push({ terms: got.terms, profile: got.profile.toString("hex"), max: got.MaxCount, top: got.MaxTopResultCount });
 
   const terms = got.terms.toLowerCase();
-  const inTerms = (/** @type {any} */ a) => !!a.title && terms.includes(a.title.toLowerCase());
+  // Or, searched for by an artist's name alone (Smart Picks, smart-picks.md §11), that artist's albums.
+  const inTerms = (/** @type {any} */ a) => (!!a.title && terms.includes(a.title.toLowerCase())) || (!!a.artist && terms === a.artist.toLowerCase());
   const library = c.albums.map((a, i) => i).filter((i) => inTerms(c.albums[i]));
   const streaming = (c.catalog || []).map((a, j) => j).filter((j) => inTerms(c.catalog[j]));
   library.forEach(c.pushAlbum);   // sent once a connection: a no-op for an album the library read sent

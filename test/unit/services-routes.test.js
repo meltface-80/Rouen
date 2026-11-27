@@ -138,7 +138,7 @@ test("the services' wiring: the routes keep index.js's order, and index.js hands
   const src = indexSource();
   // Registered where they always were, between the Qobuz/TIDAL routes that stayed in index.js.
   const marks = ["qobuzSyncAppId();", "streamServices.mountQobuzSettings(app);", "streamServices.mountTidalSettings(app);",
-    "mountServiceFavourites(app, serviceFavourites, serviceErrorStatus);", "mountLibraryAdd(app, createLibraryAdd({"].map((m) => { const at = src.indexOf(m); assert.ok(at > 0, m + " is gone"); return at; });
+    "mountServiceFavourites(app, serviceFavourites, serviceErrorStatus);", "mountLibraryAdd(app, libraryAdd);"].map((m) => { const at = src.indexOf(m); assert.ok(at > 0, m + " is gone"); return at; });
   assert.deepEqual(marks, [...marks].sort((a, b) => a - b), "the routes register in a different order");
   const at = src.indexOf("const streamServices = createServices({");
   assert.ok(at > 0 && at < marks[0], "index.js does not wire createServices before using it");

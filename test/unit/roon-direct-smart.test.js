@@ -48,7 +48,8 @@ async function rig(t, faults, o = {}) {
     read: async (s, ro) => { const r = await readAlbumsOn(s, Object.assign({ timeoutMs: 1000 }, ro)); reads.push(r.ok); return r; },
   });
   t.after(async () => { s1.turnOff(); await core.close(); });
-  if (o.off) return { core, s1, zone };
+  // Off: native mode is always on since 2.0.6-t21 (roon-native.md §11); off is the one-time choice's No.
+  if (o.off) { s1.turnOff(); return { core, s1, zone }; }
   s1.turnOn();
   assert.ok(await until(() => reads.length >= 1 && s1.albums()), "the library was never read");
   // smart.js with a short wait for the zone, on the same connection.

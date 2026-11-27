@@ -119,20 +119,18 @@ test("Not played in 6 months waits for six months of history", () => {
   assert.ok(start > -1);
   const body = src.slice(start, src.indexOf("\n});", start));
   const gate = body.indexOf("firstPlayTs()");
-  const heard = body.indexOf("getPlayedTitlesSince(");
+  const heard = body.indexOf("playedAlbumKeysSince(");
   assert.ok(gate > -1, "the route does not ask when the first play was");
   assert.ok(gate < heard, "the route reads plays before checking there are six months of them");
   assert.match(body, /if \(!first \|\| first > cutoff\)/);
   assert.match(body, /no_history: true/);
 
+  // The device's profile's first play (2.0.7-t2): the store's, asked for whose plays the request reads. An empty plays
+  // table, and no database, read as no history (profiles.test.js, the store's own test).
+  const asked = [];
   const { firstPlayTs } = loadIndexFunctions(["firstPlayTs"], {
-    labelsDb: { prepare: () => ({ get: () => ({ ts: 1234 }) }) },
+    listening: { firstPlay: (who) => { asked.push(who); return 1234; } }, profiles: { viewer: () => ({ id: "2", legacy: false }) },
   });
   assert.equal(firstPlayTs(), 1234);
-  const none = loadIndexFunctions(["firstPlayTs"], {
-    labelsDb: { prepare: () => ({ get: () => ({ ts: null }) }) },
-  });
-  assert.equal(none.firstPlayTs(), null, "an empty plays table must read as no history");
-  const noDb = loadIndexFunctions(["firstPlayTs"], { labelsDb: null });
-  assert.equal(noDb.firstPlayTs(), null);
+  assert.deepEqual(asked, [{ id: "2", legacy: false }], "the first play asked for everyone, not the device's profile");
 });

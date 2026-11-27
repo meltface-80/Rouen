@@ -186,7 +186,7 @@ test("the routes: 200 seen, 409 sent and not seen, 503 not sent, 400 refused; th
   let next = "seen";
   const asked = [];
   mountRoonDirect({ get: (p, h) => { routes["GET " + p] = h; }, post: (p, h) => { routes["POST " + p] = h; } }, /** @type {any} */ ({
-    status: () => ({}), unmatched: () => [], turnOn() {}, turnOff() {}, setProfile: () => ({}),
+    status: () => ({}), unmatched: () => [], turnOn() {}, turnOff() {},
     zoneDsp: { set: async (...a) => (asked.push(a), answers[next]), read: async (id) => ({ native: true, found: true, outputs: [], id }) } }));
   const call = async (m, p, o) => { const res = { code: 200, body: null, set() {}, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
     await routes[m + " " + p](o, res); return [res.code, res.body]; };

@@ -41,7 +41,8 @@ async function rig(t, faults, o = {}) {
     read: async (s, ro) => { const r = await readAlbumsOn(s, Object.assign({ timeoutMs: 1000 }, ro)); reads.push(s.gen + ":" + r.ok + (r.ok ? "" : " " + r.why)); return r; },
   });
   t.after(async () => { s1.turnOff(); await core.close(); });
-  if (o.off) return { core, s1, link, reads, albums, live };
+  // Off: native mode is always on since 2.0.6-t21 (roon-native.md §11); off is the one-time choice's No.
+  if (o.off) { s1.turnOff(); return { core, s1, link, reads, albums, live }; }
   s1.turnOn();
   assert.ok(await until(() => reads.length === 1 && s1.albums()), "the library was never read");
   return { core, s1, link, reads, albums, live };
@@ -218,6 +219,8 @@ test("no check once the connection's copy of what was sent has too little room l
   assert.equal(out.status, 409);
   assert.match(out.error, /room/);
   assert.equal(finder.progress().running, false);
+  // Smart Picks' artist search, likewise (smart-picks.md §11): nothing sent, and why.
+  assert.match((await finder.albumsBy("Aphex Twin")).error, /room/);
 });
 
 test("a credit as the owner's server sends it, read as the names: each artist a link, or plain", () => {
@@ -232,4 +235,29 @@ test("a credit as the owner's server sends it, read as the names: each artist a 
   assert.equal(plainCredit("[[13169786|@]]"), "@");
   assert.equal(plainCredit("Various Artists"), "Various Artists");
   assert.equal(plainCredit("'Til Tuesday"), "'Til Tuesday");
+});
+
+test("an artist's albums by the name alone (Smart Picks, smart-picks.md §11): its albums in Roon's order, each as found; or why it couldn't answer", async (t) => {
+  const w = await rig(t);
+  const got = await w.s1.finder.albumsBy("Aphex Twin");
+  assert.ok(!("error" in got), JSON.stringify(got));
+  assert.deepEqual(got.hits.map((h) => [h.title, h.artist, h.contentSource, h.albumId !== null, h.inLibrary]),
+    [["Selected Ambient Works 85-92", "Aphex Twin", 128, true, false]], "THE one: the artist's album not given as the search found it");
+  assert.deepEqual(w.core.rec.searches.map((x) => x.terms), ["Aphex Twin"], "not searched for by the name alone");
+  assert.ok(await until(() => w.core.rec.searchDisposed.length === 1), "the result was not let go");
+  // In the library: said so, for Smart Picks to pass over.
+  const mine = await w.s1.finder.albumsBy("Massive Attack");
+  assert.deepEqual(mine.hits.map((h) => [h.title, h.inLibrary]), [["Mezzanine", true]]);
+  w.live.refuseSearch = true;
+  const refused = await w.s1.finder.albumsBy("Björk");
+  assert.match(refused.error, /refused the search/);
+  w.live.refuseSearch = false;
+  w.live.incompleteSearch = true;
+  assert.match((await w.s1.finder.albumsBy("Björk")).error, /had not all arrived/);
+});
+
+test("an artist's albums: native mode off, nothing asked", async (t) => {
+  const w = await rig(t, {}, { off: true });
+  assert.deepEqual(await w.s1.finder.albumsBy("Aphex Twin"), { error: "Native mode is off." });
+  assert.equal(w.core.rec.searches.length, 0);
 });

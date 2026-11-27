@@ -71,7 +71,7 @@
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/touchnav.css">
   <link rel="stylesheet" href="/album-credits.css">
-  <link rel="stylesheet" href="/album-view.css">
+  <link rel="stylesheet" href="/album-view.css"><link rel="stylesheet" href="/picks.css">
 </head>
 <body>
   <!-- Phone landscape blocker: hidden on portrait / tablet / desktop via CSS -->
@@ -261,7 +261,6 @@
         </div>
       </div>
     </div>
-
     <div id="scan-progress-bar" class="scan-progress-bar hidden" aria-hidden="true">
       <div id="scan-progress-fill" class="scan-progress-fill"></div>
     </div>
@@ -399,7 +398,6 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
 
     <div id="album-grid" class="album-grid" aria-live="polite"></div>
   </main>
-
   </div><!-- /.app -->
 
   <!-- Side menu (hamburger). Items with data-target trigger the hidden top-bar
@@ -508,7 +506,6 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
   <!-- Album detail modal (and Now playing): public/album-view.js since v1.9.70-t10 -->
   <script src="/track-times.js"></script>
   <script src="/album-view.js"></script>
-
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
   <!-- Mini transport (now-playing bar) — Roon-style layout -->
@@ -671,8 +668,11 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
   <script src="/format.js"></script>
   <script src="/album-credits.js"></script>
   <script src="/mini-bar.js"></script>
-  <script src="/home-downloads.js"></script>
+  <script src="/home-downloads.js"></script><script src="/home-discover.js"></script>
   <script src="/update-check.js"></script>
+  <script src="/smart-picks-why.js"></script>
+  <script src="/smart-picks-tune.js"></script>
+  <script src="/profiles.js"></script>
   <script src="/app.js"></script>
   <script src="/touchnav.js"></script>
 </body>

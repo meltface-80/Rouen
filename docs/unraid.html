@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Unraid · Rouen</title>
+<meta name="description" content="Roon never shows Rouen under Settings&nbsp;→ Extensions? On Unraid the usual cause is the network, not the app.">
+<link rel="icon" href="rouen-logo.png">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+
+<header class="pagehead">
+  <div class="wrap">
+    <select id="lang-select" class="lang-select" aria-label="Language">
+      <option value="en">🇬🇧 English</option>
+      <option value="fr">🇫🇷 Français</option>
+      <option value="de">🇩🇪 Deutsch</option>
+      <option value="es">🇪🇸 Español</option>
+      <option value="it">🇮🇹 Italiano</option>
+      <option value="nl">🇳🇱 Nederlands</option>
+      <option value="sv">🇸🇪 Svenska</option>
+      <option value="da">🇩🇰 Dansk</option>
+      <option value="no">🇳🇴 Norsk</option>
+    </select>
+    <a class="back" href="index.html" data-i18n="site.contents">← Contents</a>
+    <a class="brand" href="index.html"><img src="rouen-logo.png" alt=""><span>Rouen</span></a>
+    <span class="spacer"></span>
+    <a class="pill solid" href="install.html" data-i18n="nav.install">Install</a>
+  </div>
+</header>
+
+<main class="wrap page">
+  <h1 data-i18n="k216">Unraid</h1>
+    <p data-i18n="k217" class="lead">Roon never shows <b>Rouen</b> under Settings&nbsp;→ Extensions? On Unraid the
+       usual cause is the network, not the app.</p>
+    <div class="firstrun">
+      <p data-i18n="k218" class="after-note"><b>Why.</b> On Unraid, Roon Server normally runs on the <code>br0</code>
+         custom network (macvlan/ipvlan) with an IP address of its own, which is what RAAT needs.
+         A container on <code>--network host</code> sits on Unraid's own interface instead, and
+         Unraid's kernel keeps the two apart: the discovery broadcast never reaches the Core, and
+         by default the host cannot even open a connection to a <code>br0</code> address. The fix
+         is to put Rouen on <code>br0</code> too, with its own free IP, and tell it where the Core
+         is with <code>ROON_CORE_IP</code>, which connects straight to the Core instead of
+         discovering it.</p>
+      <ol>
+        <li data-i18n="k219"><b>Pick two addresses.</b> <code>ROON_CORE_IP</code> is your Roon Core
+            container's <code>br0</code> IP (Roon&nbsp;→ Settings&nbsp;→ General shows it). Rouen
+            needs a <b>different</b> one: a free address on your LAN, outside your router's DHCP
+            range. The examples use 192.168.1.50 for Roon and 192.168.1.60 for Rouen.</li>
+        <li data-i18n="k220"><b>Run it</b> with Compose (the <i>Docker Compose Manager</i> plugin) or
+            <code>docker run</code>, below. Change the music path to your share and
+            <code>name: br0</code> to your custom network's name if it differs.</li>
+        <li data-i18n="k221"><b>Open the app</b> at Rouen's own address, <code>http://192.168.1.60:3399</code>
+            (not the Unraid server's), then click <b>Enable</b> in Roon&nbsp;→ Settings&nbsp;→
+            Extensions.</li>
+      </ol>
+    </div>
+
+    <div class="out" style="margin-top:14px">
+      <div class="codebox">
+        <button class="copy-btn copy-static" data-copy="unraid-compose" type="button">Copy</button>
+        <pre id="unraid-compose">services:
+  musicd-remote:
+    image: ghcr.io/meltface-80/musicd-remote:latest
+    pull_policy: always
+    container_name: musicd-remote
+    restart: unless-stopped
+    networks:
+      br0_net:
+        ipv4_address: 192.168.1.60   # a free address for Rouen
+    environment:
+      TZ: "Europe/London"
+      ROON_CORE_IP: "192.168.1.50"   # your Roon Core's br0 address
+    volumes:
+      - /mnt/user/appdata/musicd-remote:/app/data
+      - /mnt/user/data/media/music:/music:ro
+
+networks:
+  br0_net:
+    external: true
+    name: br0   # your Unraid custom network</pre>
+      </div>
+      <div class="codebox">
+        <button class="copy-btn copy-static" data-copy="unraid-run" type="button">Copy</button>
+        <pre id="unraid-run">docker run -d \
+  --name musicd-remote \
+  --pull always \
+  --restart unless-stopped \
+  --network br0 \
+  --ip 192.168.1.60 \
+  -e TZ=Europe/London \
+  -e ROON_CORE_IP=192.168.1.50 \
+  -v /mnt/user/appdata/musicd-remote:/app/data \
+  -v /mnt/user/data/media/music:/music:ro \
+  ghcr.io/meltface-80/musicd-remote:latest</pre>
+      </div>
+      <div data-i18n="k222" class="note"><b>Check it reached the Core.</b> Once Rouen is enabled in Roon,
+         <code>docker logs musicd-remote</code> shows <i>[roon] paired with core …</i>. A line
+         <i>[roon] cannot reach Roon Core at 192.168.1.50:9330 — retrying every 10s</i> means the
+         address is wrong or blocked; it keeps retrying, so nothing needs restarting once it is
+         fixed. The image has no <code>ping</code>; this tests the
+         Core's port from inside the container:<br>
+         <code>docker exec musicd-remote node -e "require('net').connect(9330,'192.168.1.50').on('connect',()=&gt;{console.log('reachable');process.exit()}).on('error',e=&gt;{console.log(e.message);process.exit(1)})"</code></div>
+      <div data-i18n="k223" class="note"><b>Rather keep host networking?</b> Set <code>ROON_CORE_IP</code> anyway,
+         and let the host reach <code>br0</code>: Settings&nbsp;→ Docker, stop the Docker service,
+         set <b>Host access to custom networks</b> to <b>Enabled</b>, start it again. The app is
+         then on the Unraid server's own address.</div>
+      <div data-i18n="k224" class="note"><b>Your data.</b> These examples keep Rouen's data in
+         <code>/mnt/user/appdata/musicd-remote</code>, Unraid's usual place. If you already ran
+         it with the <code>musicd-remote-data</code> volume, use
+         <code>-v musicd-remote-data:/app/data</code> instead (or copy the volume's contents into
+         the folder first), or Roon will ask you to authorize Rouen again and your history starts
+         empty.</div>
+      <p data-i18n="k225" class="after-note">Thanks to the Unraid user who worked this out and shared it.</p>
+    </div>
+  <nav class="pager"><a class="back" href="index.html" data-i18n="site.back">← Back to contents</a></nav>
+</main>
+
+<footer>
+  <p data-i18n="k280">Rouen · MIT licence · © 2026 Lewis Menzies (Music Duck / MusicD) ·
+     <a href="https://github.com/meltface-80/MusicD-Remote">github.com/meltface-80/MusicD-Remote</a><br>
+     Roon is a trademark of Roon Labs LLC. This is an independent extension, not affiliated with Roon Labs.</p>
+</footer>
+<script src="site.js"></script>
+<script src="i18n.js"></script>
+</body>
+</html>

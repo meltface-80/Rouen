@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Install on Windows · Rouen</title>
+<meta name="description" content="Rouen runs on your Windows computer as one file — nothing else to install. You then use Rouen in your web browser, on the computer or on a phone or tablet.">
+<link rel="icon" href="rouen-logo.png">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+
+<header class="pagehead">
+  <div class="wrap">
+    <select id="lang-select" class="lang-select" aria-label="Language">
+      <option value="en">🇬🇧 English</option>
+      <option value="fr">🇫🇷 Français</option>
+      <option value="de">🇩🇪 Deutsch</option>
+      <option value="es">🇪🇸 Español</option>
+      <option value="it">🇮🇹 Italiano</option>
+      <option value="nl">🇳🇱 Nederlands</option>
+      <option value="sv">🇸🇪 Svenska</option>
+      <option value="da">🇩🇰 Dansk</option>
+      <option value="no">🇳🇴 Norsk</option>
+    </select>
+    <a class="back" href="index.html" data-i18n="site.contents">← Contents</a>
+    <a class="brand" href="index.html"><img src="rouen-logo.png" alt=""><span>Rouen</span></a>
+    <span class="spacer"></span>
+    <a class="pill solid" href="install.html" data-i18n="nav.install">Install</a>
+  </div>
+</header>
+
+<main class="wrap page">
+  <h1 data-i18n="k148">Install on Windows</h1>
+    <p data-i18n="k149" class="lead">Rouen runs on your Windows computer as one file — nothing else to install.
+       You then use Rouen in your web browser, on the computer or on a phone or tablet.</p>
+
+    <h3 data-i18n="k150" class="sub">1. Start Rouen</h3>
+    <div class="firstrun">
+      <ol>
+        <li data-i18n="k151">Download <b>Rouen-v2.0.8-windows-x64.exe</b> (the number is the version: take the newest) from the
+            <a href="https://github.com/meltface-80/Rouen/releases/latest">release page</a> (under <i>Assets</i>).
+            Keep the file — don't delete it after you run it.</li>
+        <li data-i18n="k152"><b>Double-click</b> the file. If a blue box says <i>"Windows protected your PC"</i>, click
+            <b>More info</b>, then <b>Run anyway</b>.</li>
+        <li data-i18n="k153">If a box asks about the network, click <b>Allow</b>.</li>
+        <li data-i18n="k154">A <b>black window</b> opens with some text in it. <b>Leave it open</b> — that window is Rouen.
+            Closing it stops Rouen.</li>
+        <li data-i18n="k155">After a few seconds, Rouen opens in your web browser. If it doesn't, open your browser and type
+            <code>localhost:3399</code> in the address bar, then press <b>Enter</b>.</li>
+        <li data-i18n="k156">In <b>Roon</b>, go to <b>Settings → Extensions</b> and click <b>Enable</b> next to Rouen.</li>
+      </ol>
+    </div>
+
+    <h3 data-i18n="k157" class="sub">2. Use it on your phone or tablet</h3>
+    <div class="firstrun">
+      <ol>
+        <li data-i18n="k158">On the computer, find its address: <b>Windows 11</b>: Start → Settings → Network &amp; internet →
+            <b>Properties</b>. <b>Windows 10</b>: Start → Settings → Network &amp; Internet → <b>Properties</b>.
+            Look for <b>IPv4 address</b> — something like <code>192.168.1.20</code>.</li>
+        <li data-i18n="k159">On the phone or tablet (on the same Wi-Fi), open the browser and type that address followed by
+            <code>:3399</code> — for example <code>192.168.1.20:3399</code>.</li>
+        <li data-i18n="k160">Add <code>/display</code> to the end for the wall display, or <code>/shelf</code> for the Shelf.</li>
+      </ol>
+    </div>
+
+    <h3 data-i18n="k161" class="sub">3. Start Rouen automatically (optional)</h3>
+    <div class="firstrun">
+      <ol>
+        <li data-i18n="k162"><b>Right-click</b> the Rouen file you downloaded and choose <b>Create shortcut</b> (on Windows 11,
+            choose <b>Show more options</b> first). A new file appears ending in <i>"- Shortcut"</i>.</li>
+        <li data-i18n="k163">Press the <b>Windows key</b> and <b>R</b> together. In the small box, type
+            <code>shell:startup</code> and click <b>OK</b>. A folder opens.</li>
+        <li data-i18n="k164"><b>Drag the shortcut</b> into that folder. Rouen now starts every time you turn on the computer.</li>
+      </ol>
+    </div>
+
+    <div data-i18n="k165" class="note"><b>Updates.</b> Rouen tells you when a new version is out: tap <b>Update</b> and it updates
+       itself, the same as every other install.</div>
+    <div data-i18n="k166" class="note"><b>Your settings</b> are saved by themselves and kept through every update — there are no
+       folders to look after. (For the curious: they are in <code>%LOCALAPPDATA%\Rouen\app\data</code>, a hidden
+       folder; type that into File Explorer's address bar to open it. To remove Rouen completely, close its black
+       window and delete <code>%LOCALAPPDATA%\Rouen</code>.)</div>
+    <div data-i18n="k167" class="note"><b>Music files.</b> The optional <code>/music</code> features (file-tag labels, catalogue
+       numbers, local waveforms) read your music files; on Windows they work when Rouen runs on the same
+       computer as your music library.</div>
+  <nav class="pager"><a class="back" href="index.html" data-i18n="site.back">← Back to contents</a></nav>
+</main>
+
+<footer>
+  <p data-i18n="k280">Rouen · MIT licence · © 2026 Lewis Menzies (Music Duck / MusicD) ·
+     <a href="https://github.com/meltface-80/MusicD-Remote">github.com/meltface-80/MusicD-Remote</a><br>
+     Roon is a trademark of Roon Labs LLC. This is an independent extension, not affiliated with Roon Labs.</p>
+</footer>
+<script src="site.js"></script>
+<script src="i18n.js"></script>
+</body>
+</html>

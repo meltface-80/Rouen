@@ -13,6 +13,9 @@
 //
 // Plus the rule that stops it being wasted work: only when Qobuz is the
 // default, because that is the only link the rows actually point at.
+//
+// 2.0.6-t12: the suggestions are no links any more (they open Roon's search
+// inside Rouen); the card's own Qobuz chip is still upgraded.
 // ---------------------------------------------------------------------------
 
 const test = require("node:test");
@@ -82,7 +85,7 @@ const DRIVER = `
     T("TIMED_OUT_WAITING_FOR", what);
     return false;
   }
-  var rowSel = "#share-similar-list a.share-similar-act";
+  var rowSel = "#share-similar-list .share-similar-act";   // a button since 2.0.6-t12, a link before
   var rowHref = function () {
     var a = document.querySelector(rowSel);
     return a ? a.getAttribute("href") : null;
@@ -125,76 +128,26 @@ function render(answer, pref, driver) {
   return r;
 }
 
-test("the Qobuz link is upgraded to one that opens the app", { concurrency: 1 }, async (t) => {
-  await t.test("the search link is replaced by an album link", () => {
+// 2.0.6-t12: the suggestions open Roon's own search inside Rouen (public/streaming.js find), not a link (the owner,
+// 2026-11-24: "The share card suggestions are still opening Qobuz download site and not via search within Rouen
+// Lite"). They are looked up no more; the card's own Qobuz chip, still a link to the record on the card, is.
+test("the card's Qobuz chip is upgraded to one that opens the app; the suggestions are not links", { concurrency: 1 }, async (t) => {
+  await t.test("the chip's search link is replaced by an album link", () => {
     const r = render("deep");
-    // href_when_drawn is NOT asserted here: this stub answers immediately, so
-    // the upgrade can legitimately have landed before the row is first read.
-    // The ordering is the "slow" case's job, below — a test that can pass for
-    // two different reasons says nothing about either.
-    assert.equal(r.href_after, DEEP,
-      "the row still points at " + r.href_after + " — a Qobuz search URL lands on " +
-      "their download store and can never open the app");
-    // And the card's own chip, which has exactly the same problem.
     assert.equal(r.chip_after, DEEP, "the card's Qobuz chip was left on the store");
   });
 
-  await t.test("the row does not wait for it", () => {
-    // 900ms is far longer than the row takes to appear. If the href is already
-    // the deep link when the row is first seen, the row queued behind a page
-    // read on the server.
-    const r = render("slow");
-    assert.equal(r.href_when_drawn, QOBUZ_SEARCH,
-      "the suggestion was already upgraded when it first appeared, which means it " +
-      "waited for a lookup that costs a page read");
-    assert.equal(r.href_after, DEEP, "the upgrade never arrived");
+  await t.test("THE one: a suggestion is no link, and no page read is spent on one", () => {
+    for (const pref of [undefined, "tidal"]) {
+      const r = render("deep", pref);
+      assert.equal(r.href_after, null, "a suggestion is a link again: " + r.href_after);
+      const forRows = r.calls_after.filter(u => u.indexOf("The+Idiot") > -1 || u.indexOf("The%20Idiot") > -1);
+      assert.deepEqual(forRows, [], "a page read was spent on a suggestion: " + forRows.join(", "));
+    }
   });
 
-  await t.test("a failure leaves the search link, which is not nothing", () => {
-    const r = render("none");
-    assert.equal(r.href_after, QOBUZ_SEARCH,
-      "Qobuz had nothing recognisable and the row lost its link entirely — the " +
-      "search page at least shows the right words");
-    assert.ok(r.calls_after.length >= 1, "it should still have asked");
-  });
-
-  await t.test("no SUGGESTION is looked up when Qobuz is not the default", () => {
-    const r = render("deep", "tidal");
-    // The card's own chip is still upgraded: it is on screen and it always
-    // points at Qobuz whatever the default is, so it has the same problem.
-    // The ROWS point elsewhere, so looking them up would be a page read spent
-    // on a link nobody can tap.
-    const forRows = r.calls_after.filter(u => u.indexOf("The+Idiot") > -1 ||
-                                              u.indexOf("The%20Idiot") > -1);
-    assert.deepEqual(forRows, [],
-      "a page read was spent on a link the rows do not point at: " + forRows.join(", "));
-    assert.match(r.href_after, /tidal\.com/, "the row should point at the default service");
-  });
-
-  await t.test("switching the default TO Qobuz upgrades the rows already drawn", () => {
-    // The rows were drawn pointing at TIDAL, which needs no lookup, so at the
-    // moment the default changes every row holds an un-upgraded search link.
-    // Repainting them is not enough — the links have to be asked about too.
-    //
-    // This had no test until v1.8.37, and that is exactly how a refactor there
-    // (one caller left on an older signature) disabled it without any suite
-    // noticing. A path with no assertion is a path that will break quietly.
+  await t.test("switching the default to Qobuz looks nothing up for the suggestions either", () => {
     const r = render("deep", "tidal", SWITCH_DRIVER);
-    assert.match(r.href_before_switch, /tidal\.com/, r.href_before_switch);
-    assert.equal(r.href_after_switch, DEEP,
-      "the row kept a Qobuz SEARCH link after Qobuz became the default — it opens " +
-      "their download store, never the app");
-  });
-
-  await t.test("it asks for the act's record, not the card's", () => {
-    const r = render("deep");
-    // URLSearchParams writes a space as "+", which decodeURIComponent does not
-    // turn back into one — matching on the decoded string finds nothing.
-    const forRow = r.calls_after.filter(u => u.indexOf("The+Idiot") > -1 ||
-                                             u.indexOf("The%20Idiot") > -1);
-    assert.ok(forRow.length >= 1,
-      "no lookup carried the suggestion's own album: " + r.calls_after.join(", "));
-    assert.ok(forRow[0].indexOf("Iggy+Pop") > -1 || forRow[0].indexOf("Iggy%20Pop") > -1,
-      "the lookup did not carry the suggestion's artist: " + forRow[0]);
+    assert.equal(r.href_after_switch, null);
   });
 });

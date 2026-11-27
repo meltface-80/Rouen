@@ -182,8 +182,9 @@ test("opt-in means the work does not run, not that the row is hidden",
       const ran = [];
       const F = loadIndexFunctions(["kickSmartPicks"], {
         smartPicksEnabled: enabled,
+        smartPicksServiceReady: () => true,   // something to find albums with (smart-picks.md §11)
         smartDayKey: () => "2026-08-10",
-        readSmartPicks: () => o.built || [],
+        readSmartPicks: () => o.built || [], profiles: { picksProfiles: () => ["1"] },   // each profile's (2.0.7-t3)
         smartAttemptedToday: () => !!o.attempted,
         smartPicksDue: () => o.due !== false,
         buildSmartPicks: () => Promise.resolve(),
@@ -286,4 +287,17 @@ test("a row whose feature is switched off reports itself unavailable", async (t)
         id + " became unavailable because an unrelated feature was switched off");
     }
   });
+});
+
+test("2.0.8-t8: Discover is one of Home's rows, after Smart Picks, and a layout saved before it gains it switched on", () => {
+  const { homeRowIds, repairHomeRows } = require("../../lib/routes/home-rows");
+  const ids = homeRowIds();
+  assert.equal(ids.indexOf("discover"), ids.indexOf("picks") + 1, "THE one for the owner: no Discover row on Home");
+  const before = ["unplayed", "history", "picks", "random"].map((id) => ({ id, on: true }));
+  assert.deepEqual(repairHomeRows(before).find((r) => r.id === "discover"), { id: "discover", on: true }, "hidden on an install updated");
+  assert.deepEqual(repairHomeRows(before).map((r) => r.id).slice(0, 5), ["downloads", "unplayed", "history", "picks", "discover"],
+    "the review: last on Home, not after Smart Picks, on an install updated");
+  const { homeRowUnavailable } = require("../../lib/routes/home-rows");
+  assert.equal(homeRowUnavailable("discover", true, true, false), "Discover is off in Settings", "the review: offered with Discover off");
+  assert.equal(homeRowUnavailable("discover", true, true, true), null);
 });

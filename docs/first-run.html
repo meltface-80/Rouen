@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>First run · Rouen</title>
+<meta name="description" content="The container is up — four steps and you're listening.">
+<link rel="icon" href="rouen-logo.png">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+
+<header class="pagehead">
+  <div class="wrap">
+    <select id="lang-select" class="lang-select" aria-label="Language">
+      <option value="en">🇬🇧 English</option>
+      <option value="fr">🇫🇷 Français</option>
+      <option value="de">🇩🇪 Deutsch</option>
+      <option value="es">🇪🇸 Español</option>
+      <option value="it">🇮🇹 Italiano</option>
+      <option value="nl">🇳🇱 Nederlands</option>
+      <option value="sv">🇸🇪 Svenska</option>
+      <option value="da">🇩🇰 Dansk</option>
+      <option value="no">🇳🇴 Norsk</option>
+    </select>
+    <a class="back" href="index.html" data-i18n="site.contents">← Contents</a>
+    <a class="brand" href="index.html"><img src="rouen-logo.png" alt=""><span>Rouen</span></a>
+    <span class="spacer"></span>
+    <a class="pill solid" href="install.html" data-i18n="nav.install">Install</a>
+  </div>
+</header>
+
+<main class="wrap page">
+  <h1 data-i18n="k250">First run</h1>
+    <p data-i18n="k251" class="lead">The container is up — four steps and you're listening.</p>
+    <div class="firstrun">
+      <ol>
+        <li data-i18n="k252"><b>Enable the extension in Roon.</b> Roon → Settings → Extensions — <b>Rouen</b> (publisher MusicD) appears there once the container is running. Click <b>Enable</b>.</li>
+        <li data-i18n="k253"><b>Open the app.</b> Browse to <code>http://&lt;your-server-ip&gt;:3399</code> from any phone, tablet or desktop on your network. Add it to your home screen for an app-like experience.</li>
+        <li data-i18n="k254"><b>Add your API keys.</b> ☰ → Settings → Setup → API Keys → paste in the keys from <a href="api-keys.html">above</a>. For labels, switch on Settings → Setup → Record labels and let the label scan run.</li>
+        <li data-i18n="k255"><b>Optional: wall display and Shelf.</b> Switch on Settings → Wall Display, then point a TV or spare tablet at <code>http://&lt;your-server-ip&gt;:3399/display</code>. Shelf needs no switch: <code>http://&lt;your-server-ip&gt;:3399/shelf</code> flicks through your covers.</li>
+      </ol>
+    </div>
+  <nav class="pager"><a class="back" href="index.html" data-i18n="site.back">← Back to contents</a></nav>
+</main>
+
+<footer>
+  <p data-i18n="k280">Rouen · MIT licence · © 2026 Lewis Menzies (Music Duck / MusicD) ·
+     <a href="https://github.com/meltface-80/MusicD-Remote">github.com/meltface-80/MusicD-Remote</a><br>
+     Roon is a trademark of Roon Labs LLC. This is an independent extension, not affiliated with Roon Labs.</p>
+</footer>
+<script src="site.js"></script>
+<script src="i18n.js"></script>
+</body>
+</html>

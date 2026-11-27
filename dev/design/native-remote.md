@@ -132,6 +132,12 @@ fails (the owner's answer, 2026-10-14) — read on a connection opened for it, n
 before, and failed too when that connection cannot be opened. A read cut short by a planned
 reconnect is not a failure: the next session reads again.
 
+*Since 2.0.6-t21 (`roon-native.md` §11, the owner, 2026-11-26): nothing turns it off. A failed
+check, a server that refuses the connection, three openings in a row that reach it and fail, or
+three reads in a row that fail suspend it instead: the official API serves everything until the
+next try (04:00, Rouen's start, an update). A connection that cannot be opened because the server
+is out of reach is a drop, retried as before, check or not.*
+
 ### 3.4 Covers
 The official API's image service stays. First tried: whether it accepts the Core's own cover key
 (v1.9.18's `coverSame` count, from the owner's install, says whether the two keys are one key). If
@@ -155,8 +161,9 @@ answers the Core's pings; holds the root graph (zones, outputs, profiles), kept 
 Core's updates. Closed and opened again **every night at 04:00**, after any error or decode
 failure, when the graph passes its cap, and on a Core or Rouen update (with stage 1's check, §8.5
 of `roon-native.md`). Every query it opens is disposed and every page released, as now. Settings →
-Roon shows the connection: up since, objects held, last reconnect and why. Off: closed, nothing of
-it runs.
+Roon shows the connection: up since, objects held, last reconnect and why. Off (the one-time
+choice's No, or `ROUEN_NATIVE=off`) or suspended (`roon-native.md` §11.2): closed, nothing of it
+runs, and a suspended one is opened again at the next try.
 
 **Keepalives (v1.9.24).** The server reaps a connection it has heard nothing from for about 30 s
 ("no keepalive from … in 34289ms; reaping dead peer to release its held session", the owner's
@@ -197,7 +204,7 @@ Native status (§3.3), and each moving the official-API code it replaces out of 
 |---|---|---|
 | **N1a** (v1.9.21) | the link (§4); the library from the Core (§3.2); Native status for both | the official API's album open, page and play actions (`lib/provider/public/`) |
 | **L** | the login (`dev/design/login.md`) — no native call | settings persistence (`dev/quality.md`'s order, item 2) |
-| **N2** (§8) | hearts (album and track) and add to library, for the profile chosen in Settings → Roon (`roon-native.md` §8.4); each shown as the Core has it (`IsFavorite`); Listen Later moves to Roon's own | the service favourite routes' Roon side |
+| **N2** (§8) | hearts (album and track) and add to library, for the profile chosen in Settings → Roon (`roon-native.md` §8.4; a linked Rouen profile's own since 2.0.7-t4, `profiles.md` §5); each shown as the Core has it (`IsFavorite`); Listen Later moves to Roon's own | the service favourite routes' Roon side |
 | **N3** | zones, outputs, now playing, transport, volume, mute, shuffle, repeat, Roon Radio, standby; grouping and transfer; zone settings and DSP (§1.7) | zone, transport and volume routes; radio's transport calls |
 | **N4** | playing an album, a track, next and queue (`PlayAlbum`, `PlayTrack`, `PlayParameters`), by the Core's own album | the play routes |
 | **N5** | album pages (`GetAlbum`, its tracks); the queue: read, remove, move, clear, play from an item | the album page route and the album index build; queue routes |
@@ -452,7 +459,13 @@ only), so the search has never been run on a catalogue album there. **The owner'
    imports later. An add that native mode cannot send (below) falls back to today's way too (§9's
    answer 2), and says why.
 3. **Where:** the TIDAL and Qobuz album pages (§10.3), and the "+ Add" of Smart Picks and Listen
-   Later on Home.
+   Later on Home. **Since 2.0.6-t14 also the album view's ⋯ ("Add to library", first), for a suggestion
+   not in the library** (Smart Picks, the share card's "If you like this", Discover), which opens the album
+   view now and no longer the TIDAL or Qobuz page it was added from (the owner, 2026-11-24: "The album screens
+   must be the uniform album screen for all albums in the grid screens"; `rouen-lite.md` §3). The same call
+   and the same words as the pick's "+ Add", from the pick's own service and album where it names them, else
+   the default service among Roon's; once the album is in the library the view reopens it there. No heart
+   until then.
 
 **What the user sees.** A TIDAL or Qobuz album page for an album not in the library offers
 "＋ Add to library" where one in it says "In your library — open it there". Tapped, it shows "…",
@@ -559,7 +572,7 @@ its level by title, paged through as `findItemByTitle` pages (the browse API's i
 load that gave them; the probe keeps its own lookup so every call counts against its budget).
 
 **`GET /api/debug/roon-listen-later?run=1` — Roon's own Listen Later**, over native mode's
-connection, for the profile chosen in Settings → Native mode (`lib/roon-direct/listen-later.js`):
+connection, for the profile chosen in Settings → Native mode, or a linked Rouen profile's own (`profiles.md` §5) (`lib/roon-direct/listen-later.js`):
 `Library::GetListenLater(Profile, IList<string>, ResultCallback<DataList<ListenLaterItem>>)`, the
 catalogue's string — never run by upstream's client nor captured from Roon's app, so how its second
 argument is read is this design's: a by-reference argument (the Profile object, as a track's object
@@ -724,7 +737,7 @@ hand**: a discarded day or "Not for me" never writes to your library.
 **The call** (the catalogue's string, never run upstream nor captured):
 `Library::SetListenLaterState(System.Sooid, IEnumerable<AlbumBase>, ListenLaterState, ResultCallback)`.
 Its arguments are those of `FavoriteOrBan`'s album form, which is proven (§8): the profile's id (the
-one chosen in Settings → Native mode), a collection of inline `AlbumLink { AlbumId, Broker }`, then
+one chosen in Settings → Native mode, or a linked Rouen profile's own, `profiles.md` §5), a collection of inline `AlbumLink { AlbumId, Broker }`, then
 the state, an enum. `ListenLaterState` is None 0, Pending 1, Played 2. An add sends Pending. A removal
 sends None. Whether Roon's own app takes an album off by None or by Played was never captured, so
 this is tried, not trusted (§3.3): it is believed only when the list no longer shows the album.

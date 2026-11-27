@@ -244,3 +244,19 @@ test("the routes: a malformed request is 400; what is answered is passed on", as
   assert.deepEqual([ok.code, ok.body.ok, ok.body.added], [200, true, 1]);
   assert.deepEqual((await call("GET /api/roon-playlists", {})).body, { available: true, playlists: [{ id: "aa", name: "Morning", tracks: 3 }] });
 });
+
+// P2 (2.0.7-t4, profiles.md §5, §10.17): a device's own routes act in Roon for its Rouen profile's Roon profile; the
+// moves onto Roon's are the household's, so they run outside the request that set them going (lib/profiles/context.js).
+const { deviceCtx } = require("../lib/device-context");
+
+test("P2: Rouen's playlists are copied onto the household's Roon profile (§13.2), not the device's whose save set it going", async () => {
+  const d = deviceCtx();
+  const link = { now: {}, read: true };
+  const w = rig({ link, rouen: [{ id: "up_1", name: "From Rouen", tracks: [T("A")] }] });
+  const seen = [];
+  const real = w.calls.push.bind(w.calls);
+  w.calls.push = (...c) => { seen.push(d.seen()); return real(...c); };
+  await d.run(async () => { assert.deepEqual(w.np.maybeCopy(), { running: true, total: 1 }); await settled(w.np); });
+  assert.ok(seen.length, "nothing was sent");
+  assert.deepEqual(seen.filter((v) => v.viewer !== null || v.roon !== null), [], "THE one: the copy ran as the device's request");
+});

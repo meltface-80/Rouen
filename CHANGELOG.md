@@ -6,6 +6,101 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.8] — 2026-11-27
+
+Profiles shared with Roon, Smart Picks that follow your listening and need no streaming sign-in, and Discover on Home.
+Everything since v2.0.5 (2.0.6 and 2.0.7 were held and are in this release).
+
+### New
+
+- **Profiles:** who's listening, chosen at the top of the side menu. Each profile has its own hearts, plays, Recently
+  played, Smart Picks, Tune and Listen later. Guest counts for no one.
+- **Profiles are Roon's:** your Roon profiles show up in Rouen under their names, and a profile made or renamed in Rouen
+  is made or renamed in Roon.
+- **A zone's listening counts for a profile** (Settings → Audio Devices → the zone).
+- **Discover on Home:** a row of the newest records from the artists you play, after Smart Picks.
+- **Tune Smart Picks:** how far back to listen, how adventurous, and which genres, decades and artists.
+- **Why these picks:** which of your artists the day's picks started from.
+
+### Changed
+
+- **Smart Picks follows your listening:** it starts from the artists you play, shared across your genres and decades.
+- **Smart Picks need no Qobuz or TIDAL sign-in in Rouen:** with native mode, your Roon server finds and adds each pick.
+  Rebuild runs straight away.
+- **What counts as a play:** a track 95% heard; an album once every track is played in one listening.
+- **Native mode is always on.** If Roon closes its path, Rouen uses the official extension API and tries again
+  nightly and after updates. `ROUEN_NATIVE=off` turns it off.
+- **Album dates are Roon's own** (native mode).
+- **Backups** carry the profiles, never their plays.
+
+### Fixed
+
+- **Suggestions not in your library open their album screen inside Rouen, and play** (Smart Picks, the share card,
+  Discover), including titles with an edition ("- 25th Anniversary Edition", "(Remastered)").
+- **Native mode no longer runs out of room** minutes after connecting.
+- **The search screen's top result plays.**
+- **Recently added dates new albums** on a library with no files (Qobuz or TIDAL only).
+- **The share card shows the album screen's release date.**
+- **A play belongs to the album it was played from,** and a paused track counts once.
+
+## [2.0.7] — 2026-11-26
+
+Held and never released on its own: it is in 2.0.8.
+
+### New
+
+- **Profiles:** who's listening, chosen at the top of the side menu. Each profile has its own plays, Recently played,
+  Smart Picks, Tune and Listen later. Guest counts for no one.
+- **A zone's listening counts for a profile** (Settings → Audio Devices → the zone).
+- **A profile can have its Roon profile** (when your Roon server has more than one): its hearts, Add to library and
+  Roon's Listen later are that Roon profile's.
+- **Tune Smart Picks:** how far back to listen, how adventurous, and which genres, decades and artists.
+- **Why these picks:** which of your artists the day's picks started from.
+
+### Changed
+
+- **Smart Picks follows your listening:** it starts from the artists you play, shared across your genres and decades.
+- **What counts as a play:** a track 95% heard; an album once every track is played in one listening.
+- **Native mode is always on.** If Roon closes its path, Rouen uses the official extension API and tries again
+  nightly and after updates. `ROUEN_NATIVE=off` turns it off.
+- **Album dates are Roon's own** (native mode).
+- **Backups** carry the profiles, never their plays.
+
+### Fixed
+
+- **Suggestions not in your library open their album screen inside Rouen, and play** (Smart Picks, the share card,
+  Discover).
+- **The search screen's top result plays.**
+- **Recently added dates new albums** on a library with no files (Qobuz or TIDAL only).
+- **The share card shows the album screen's release date.**
+- **A play belongs to the album it was played from,** and a paused track counts once.
+
+## [2.0.6] — 2026-11-26
+
+Held and never released on its own: it is in 2.0.8.
+
+### New
+
+- **Why these picks:** a button on Smart Picks shows which of your artists the day's picks started from, and why.
+
+### Changed
+
+- **Smart Picks follows your listening:** it starts from the artists you actually play (recent plays count more),
+  shared across your genres and decades, instead of the artists you own most of. Famous artists count at a quarter.
+- **What counts as a play:** a track at 95% heard; an album once every track is played in one listening.
+- **Native mode is always on, with no switch.** If Roon closes its path, Rouen falls back to the official extension
+  API and tries again nightly and after updates. `ROUEN_NATIVE=off` turns it off.
+- **Album dates are Roon's own** (native mode).
+
+### Fixed
+
+- **Suggestions not in your library open their album screen inside Rouen, and play** (Smart Picks, the share card,
+  Discover).
+- **The search screen's top result plays.**
+- **Recently added dates new albums** on a library with no files of its own (Qobuz or TIDAL only).
+- **The share card shows the album screen's release date.**
+- **A play belongs to the album it was played from,** and a paused track counts once.
+
 ## [2.0.5] — 2026-11-11
 
 A fix for playlists. The test build 2.0.5-t1 is folded into this entry.

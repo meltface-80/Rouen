@@ -62,7 +62,7 @@ function build(opts) {
   }));
 
   return loadIndexFunctions(
-    ["libraryView", "artistSortName", "libraryPrefix", "libraryPrefixMax", "albumMatchesPrefix", "normalize", "albumPlayKey", "libFacetDefs", "facetMatch", "albumGenresOf", "albumFileFactsOf",
+    ["libraryView", "artistSortName", "libraryPrefix", "libraryPrefixMax", "albumMatchesPrefix", "normalize", "libFacetDefs", "facetMatch", "albumGenresOf", "albumFileFactsOf",
      "albumYearOf", "albumYearKey", "albumDateOf", "albumAddedOf", "seededRank",
      "libAddedWindows", "countWithAny", "smartPlaylistAlbums", "smartOrderDefault",
      "smartOrders", "albumFileFacts",
@@ -89,9 +89,9 @@ function build(opts) {
       resolveAlbumLabelName: (al) => (opts.labels || {
         "kind of blue": "Columbia", "the wall": "Harvest", "goo": "DGC",
       })[al.nTitle] || null,
-      getPlayedTitlesSince: () => new Set(opts.played || []),
-      playedTitleSet: () => new Set(opts.played || []),
-      playStats: () => ({ count: new Map(), last: new Map() }),
+      listenKey: (al) => String(al.title || "").toLowerCase().trim(),   // keyed by title here (2.0.6-t20)
+      playedAlbumKeysSince: () => new Set(opts.played || []), playedAlbumKeySet: () => new Set(opts.played || []),
+      playStats: () => ({ count: new Map(), last: new Map() }), profiles: { viewer: () => null, viewerKey: () => "*" },
     });
 }
 

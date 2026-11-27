@@ -246,3 +246,24 @@ test("THE one for the owner's report: a heart changed in your server's own app s
   assert.equal(r.pressed_after_tap, "true");
   assert.equal(r.gets_after_close, 0, "the heart of an album no longer shown was still asked about");
 });
+
+// profiles.md §13.2 (the owner, 2026-11-26: "Unable to heart albums"): a profile with no Roon profile shows the heart
+// dimmed, a tap saying why, rather than no heart at all.
+test("THE one: a profile with no Roon profile has its heart dimmed beside Play Now, and a tap says to pair it in Settings → Profiles", async () => {
+  if (!harness.available) return;
+  const why = "This profile has no Roon profile, so no favourites, adds or Listen later of its own: pair it with one in Settings → Profiles. Guest has none.";
+  const r = harness.renderPage({ name: "hearts-unpaired", windowSize: "390x844", stub: STUB_FOR({ available: false, why }), driver: `
+  await window.__openAlbum({ title: "Blue", subtitle: "Joni Mitchell", image_key: "k", offset: 0 });
+  await window.__sleep(400);
+  var row = document.getElementById("modal-actions");
+  var heart = row.querySelector(".heart-btn");
+  T("heart", heart ? { dim: heart.classList.contains("heart-unpaired"), label: heart.getAttribute("aria-label"), first: row.firstElementChild === heart } : null);
+  if (heart) { heart.click(); await window.__sleep(200); }
+  T("toast", (document.getElementById("toast") || {}).textContent || "");
+  T("posts", window.__posts);
+` });
+  harness.assertNoPageError(assert, r);
+  assert.deepEqual(r.heart, { dim: true, label: "Favourite: " + why, first: true }, "THE one: the heart gone with nothing said");
+  assert.equal(r.toast, why);
+  assert.deepEqual(r.posts, [], "a heart sent for a profile with none");
+});

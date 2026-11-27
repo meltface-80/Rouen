@@ -11,6 +11,10 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { mountListenLater } = require("../../lib/routes/listen-later");
+let Database = null;
+try { Database = require("../../lib/sqlite-compat").adapterOver(require("node:sqlite")); } catch (e) {
+  // node:sqlite is Node 22.5+'s: without it, the tests of whose each album is (2.0.7-t5) skip, said as skipped
+}
 const { loadIndexFunctions } = require("../lib/extract");
 // Rouen's own album key, as index.js gives the module (v1.9.49: the bug was in what it can't key).
 const { albumKey } = loadIndexFunctions(["albumKey", "normalize", "canonText", "canonArtist"], {});
@@ -27,6 +31,8 @@ function rig(o = {}) {
   const native = {
     async list() { return o.unread ? { notRead: "Your server's Listen Later can't be read." } : { entries: roon, at: 1000 }; },
     has(w) { return o.unread ? null : roon.some((e) => keyOf(e.title, e.artist) === keyOf(w.title, w.artist)); },
+    entryOf(w) { return o.unread ? null : roon.find((e) => keyOf(e.title, e.artist) === keyOf(w.title, w.artist)) || false; },
+    entries() { return o.unread ? null : roon; },
     async set(w, on) { sets.push([w, on]); return o.answer || { ok: true, on }; },
     refreshed: [], async refresh(age) { native.refreshed.push(age); return {}; },
     // The move (v1.9.47): what the native side would hand back as on Roon's list, at once.
@@ -48,7 +54,7 @@ function rig(o = {}) {
     remove: (title, artist) => { const n = rows.length; rows.splice(0, rows.length, ...rows.filter((r) => r.key !== keyOf(title, artist))); return n - rows.length; },
     favourites: async () => ({ qobuz: null, tidal: null }), withSource: (a) => Object.assign({ badge: true }, a),
     serviceUrl: () => null, keyOf: o.keyOf || keyOf, dbReady: () => true, writable: () => !o.frozen, refreshMs: 0, now: () => clock.t,
-    cover: o.cover,
+    cover: o.cover, owners: o.owners, viewer: o.viewer, linked: o.linked,
   });
   const call = async (k, req) => {
     const res = { code: 200, body: null, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
@@ -219,4 +225,129 @@ test("v1.9.62 (native-remote.md §12.17): a cover your server names by its own k
   const w = rig({ cover: (k) => ({ k7: "img3" })[k] || null });
   const got = (await w.call("GET /api/listen-later")).body;
   assert.deepEqual(got.albums.map((a) => [a.title, a.image]), [["Dummy", "/api/image/img3?size=500"], ["Homogenic", ""]]);
+});
+
+// P2 (2.0.7-t4, profiles.md §5, §10.17): a device's own routes act in Roon for its Rouen profile's Roon profile; the
+// moves onto Roon's are the household's, so they run outside the request that set them going (lib/profiles/context.js).
+const { deviceCtx } = require("../lib/device-context");
+
+test("P2: Rouen's own list moves onto the household's Roon profile (§13.2), not the device's that opened Listen later", async () => {
+  const d = deviceCtx();
+  const w = rig();
+  const seen = [];
+  const { move, has } = w.native;
+  w.native.move = (rows, moved) => { seen.push(["move", d.seen()]); return move(rows, moved); };
+  w.native.has = (x) => { seen.push(["has", d.seen()]); return has(x); };
+  let inside = null;
+  await d.run(async () => { inside = d.seen(); await w.call("GET /api/listen-later"); });
+  assert.deepEqual(inside, { viewer: { id: "2", legacy: false }, roon: "deadbeef" }, "the request was not the device's");
+  assert.ok(seen.some((s) => s[0] === "move"), "no move");
+  assert.deepEqual(seen.filter((s) => s[1].viewer !== null || s[1].roon !== null), [], "THE one: the move ran as the device's request");
+});
+
+// 2.0.7-t5 (profiles.md §12, the owner's answers §10.18): Roon's list stays the one store; each profile sees what it put
+// aside and what no profile did; Guest sees the shared ones; taken off while another profile has it, only the tag goes.
+test("Listen later per profile: each sees its own and the household's; one taken off another's still has stays", { skip: !Database }, async () => {
+  const { createLaterOwners } = require("../../lib/listen-later/owners");
+  const db = new Database(":memory:");
+  const owners = createLaterOwners({ db: () => db });
+  owners.migrate(db);
+  let who = "1";
+  const w = rig({ owners, viewer: () => who });
+  const titles = async () => (await w.call("GET /api/listen-later", {})).body.albums.map((a) => a.title);
+  assert.deepEqual(await titles(), ["Dummy", "Homogenic"], "the household's (no tag) not everyone's");
+  // Dummy is on Roon's list: putting it aside is the tag only, nothing sent to Roon.
+  assert.deepEqual((await w.call("POST /api/listen-later", { body: { title: "Dummy", artist: "Portishead", on: true } })).body, { ok: true, on: true, roon: true });
+  assert.deepEqual(w.sets, [], "an album already on Roon's list sent again");
+  who = "2";
+  assert.deepEqual(await titles(), ["Homogenic"], "THE one: profile 1's album shown to profile 2");
+  assert.equal(w.later.has("Dummy", "Portishead"), false, "the album view said profile 1's is on profile 2's list");
+  who = "";
+  assert.deepEqual(await titles(), ["Homogenic"], "Guest sees a profile's own");
+  // Profile 2 puts Dummy aside too; profile 1 takes it off: only 1's tag goes, Roon's list is untouched.
+  who = "2";
+  await w.call("POST /api/listen-later", { body: { title: "Dummy", artist: "Portishead", on: true } });
+  who = "1";
+  assert.deepEqual((await w.call("POST /api/listen-later", { body: { title: "Dummy", artist: "Portishead", on: false } })).body, { ok: true, on: false, roon: true });
+  assert.deepEqual(w.sets, [], "taken off Roon's list while another profile has it");
+  assert.deepEqual(await titles(), ["Homogenic"]);
+  who = "2";
+  assert.deepEqual(await titles(), ["Dummy", "Homogenic"], "profile 2 lost it when profile 1 took it off");
+  await w.call("POST /api/listen-later", { body: { title: "Dummy", artist: "Portishead", on: false } });
+  assert.deepEqual(w.sets.map(([x, on]) => [x.title, on]), [["Dummy", false]], "the last one's not taken off Roon's list");
+  // The household's taken off by anyone: off Roon's list.
+  await w.call("POST /api/listen-later", { body: { title: "Homogenic", artist: "Björk", on: false } });
+  assert.deepEqual(w.sets.map(([x, on]) => [x.title, on]), [["Dummy", false], ["Homogenic", false]]);
+  // A Smart Pick sent to Listen later is its profile's.
+  await w.later.put({ title: "Selected Ambient Works 85-92", artist: "Aphex Twin", profile: "1" });
+  assert.deepEqual(owners.exportAll().map((r) => [r.title, r.profile]), [["Selected Ambient Works 85-92", "1"]]);
+});
+
+test("Listen later per profile, native mode off: Rouen's own list, the same way", { skip: !Database }, async () => {
+  const { createLaterOwners } = require("../../lib/listen-later/owners");
+  const db = new Database(":memory:");
+  const owners = createLaterOwners({ db: () => db });
+  owners.migrate(db);
+  let who = "1";
+  const w = rig({ noNative: true, owners, viewer: () => who });
+  const titles = async () => (await w.call("GET /api/listen-later", {})).body.albums.map((a) => a.title);
+  await w.call("POST /api/listen-later", { body: { title: "Dummy", artist: "Portishead", on: true } });
+  assert.deepEqual((await titles()).sort(), ["Blue", "Dummy"]);
+  who = "2";
+  assert.deepEqual(await titles(), ["Blue"], "THE one: profile 1's album on profile 2's list");
+  assert.equal(w.later.has("Dummy", "Portishead"), false);
+  assert.equal(w.later.has("Blue", "Joni Mitchell"), true, "the household's hidden");
+  await w.call("POST /api/listen-later", { body: { title: "Dummy", artist: "Portishead", on: false } });
+  who = "1";
+  assert.deepEqual((await titles()).sort(), ["Blue", "Dummy"], "profile 2 took profile 1's album off the list");
+});
+
+// The review of 2.0.7-t5: a removal Roon's list didn't take keeps the tags; a pick stays a pick; tags of albums on
+// neither list go after a whole read; a linked device's own Roon list has no tags; one sent and not shown is tagged.
+test("Listen later per profile, the review: failed removals, picks, the tidy-up, linked devices", { skip: !Database }, async () => {
+  const { createLaterOwners } = require("../../lib/listen-later/owners");
+  const make = () => { const db = new Database(":memory:"); const o = createLaterOwners({ db: () => db }); o.migrate(db); return o; };
+  const DUMMY = { key: keyOf("Dummy", "Portishead"), albumId: null };
+  // Taken off, Roon's list unreadable: kept on it, so its tags stay (else it is everyone's).
+  let owners = make();
+  let w = rig({ owners, viewer: () => "1", answer: { notSent: "Your server's Listen Later can't be read." } });
+  await w.call("POST /api/listen-later", { body: { title: "Dummy", artist: "Portishead", on: true } });
+  await w.call("POST /api/listen-later", { body: { title: "Dummy", artist: "Portishead", on: false } });
+  assert.equal(owners.viewFor("2")(DUMMY), false, "THE one: a removal Roon's list never took made profile 1's album everyone's");
+  // A pick put aside from its card is a pick; put aside again from the album view, still a pick.
+  owners = make();
+  w = rig({ owners, viewer: () => "1" });
+  await w.call("POST /api/listen-later", { body: { title: "Dummy", artist: "Portishead", on: true, source: "picks" } });
+  await w.call("POST /api/listen-later", { body: { title: "Dummy", artist: "Portishead", on: true } });
+  assert.deepEqual(owners.exportAll().map((t) => t.source), ["picks"], "a pick's tag lost its source: Not for me would miss it");
+  // The tidy-up: after a whole read, a tag whose album is on neither list goes; one on Roon's list stays.
+  owners.claim("1", { key: keyOf("Gone", "Nobody"), albumId: null, title: "Gone", artist: "Nobody" });
+  await w.call("GET /api/listen-later", {});
+  assert.deepEqual(owners.exportAll().map((t) => t.title), ["Dummy"], "a tag of an album taken off in Roon's app kept: put back, it would be hidden");
+  // A device acting for its own Roon profile: that list is its own already — no tags written, none hiding.
+  owners = make();
+  owners.claim("2", { key: keyOf("Homogenic", "Björk"), albumId: null, title: "Homogenic", artist: "Björk" });
+  w = rig({ owners, viewer: () => "1", linked: () => true });
+  assert.deepEqual((await w.call("GET /api/listen-later", {})).body.albums.map((a) => a.title), ["Dummy", "Homogenic"], "another profile's tag hid an album on a linked device's own list");
+  await w.call("POST /api/listen-later", { body: { title: "Dummy", artist: "Portishead", on: true } });
+  assert.deepEqual(owners.exportAll().map((t) => t.title), ["Homogenic"], "tagged on a linked device's own Roon list");
+  // Sent and not shown: Roon may hold it, so it is this profile's.
+  owners = make();
+  w = rig({ owners, viewer: () => "1", answer: { notShown: "not shown" } });
+  await w.call("POST /api/listen-later", { body: { title: "Mezzanine", artist: "Massive Attack", on: true } });
+  assert.deepEqual(owners.exportAll().map((t) => [t.title, t.profile]), [["Mezzanine", "1"]]);
+});
+
+test("§13.2, the review: a device with no Roon profile of its own puts nothing aside — not on Rouen's own list either, which is moved onto the household's", async () => {
+  const { WHY_NOBODY } = require("../../lib/roon-direct/session");
+  const w = rig({ answer: { notSent: WHY_NOBODY } });
+  const before = w.rows.length;
+  const r = await w.call("POST /api/listen-later", { body: { title: "Moon Safari", artist: "Air", on: true } });
+  assert.deepEqual([r.code, r.body], [409, { error: WHY_NOBODY }]);
+  assert.equal(w.rows.length, before, "THE one: kept on Rouen's own list, then moved onto another profile's Roon list");
+  await w.later.put({ title: "Moon Safari", artist: "Air", source: "picks", profile: "2" });
+  assert.equal(w.rows.length, before, "a Smart Pick of a profile with none put on Rouen's own list");
+  // Any other reason it wasn't sent: Rouen's own list, as before.
+  const other = rig({ answer: { notSent: "Your server's search didn't answer." } });
+  assert.equal((await other.call("POST /api/listen-later", { body: { title: "Moon Safari", artist: "Air", on: true } })).code, 200);
 });

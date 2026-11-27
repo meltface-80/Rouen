@@ -29,13 +29,14 @@ test("THE one: all well — every row green but an add never asked for, in the p
   for (const r of rows) assert.ok(r.name && r.line, `${r.id} has no name or line`);
 });
 
-test("native mode off: every row grey, none red; turned itself off: red, why", () => {
+test("native mode off: every row grey, none red; suspended (2.0.6-t21, §11.2): red, why, and when it tries again", () => {
   const off = { on: false, active: false, link: null, hearts: null };
   const rows = boardRows({ status: off, later: { read: null, move: null, rouen: 0 }, smart: { read: null, move: null, rouen: 0 },
     playlists: { read: null, copy: null, rouen: 0 }, add: null });
   assert.deepEqual(new Set(rows.map((r) => r.light)), new Set(["grey"]));
-  const failed = boardRows(merged({ status: Object.assign({}, off, { offReason: "The check after an update failed." }) }));
-  assert.deepEqual([lights(failed).library, lineOf(failed, "library")], ["red", "Native mode turned itself off: The check after an update failed."]);
+  const failed = boardRows(merged({ status: Object.assign({}, UP, { suspended: { why: "The check after an update failed.", at: 1 } }) }));
+  assert.deepEqual([lights(failed).library, lineOf(failed, "library")], ["red", "Native mode isn't in use: The check after an update failed. "
+    + "Rouen is using the official extension API, and tries again at 04:00, when Rouen restarts, or when Rouen or your server updates."]);
 });
 
 test("each failure is red, with its reason", () => {
@@ -136,7 +137,7 @@ test("v1.9.67-t6: catalogue numbers and kinds — the walk's state, and what eve
   // Out of this connection's room (v2.0.3-t17): not a fault, so not red; the rest on the next connection.
   const roomy = boardRows(merged({ releases: { walk: { running: false, last: Object.assign({}, whole.last, { whole: false, why: "the room…", read: 2150, next: "connection" }) }, counts } }));
   assert.deepEqual([lights(roomy).releases, lineOf(roomy, "releases").split(". ")[0]], ["grey",
-    "Your server's values read for 2,150 albums of 13,112 so far, kept; the rest on the next connection to your server (overnight, or when native mode is turned off and on), as each has room for a part"]);
+    "Your server's values read for 2,150 albums of 13,112 so far, kept; the rest on the walk's next connection of its own, a part each, going on by itself"]);
   const notKept = boardRows(merged({ releases: { walk: { running: false, last: Object.assign({}, whole.last, { why: "keeping them failed: disk full" }) }, counts } }));
   assert.deepEqual([lights(notKept).releases, lineOf(notKept, "releases").split(". ")[0]], ["red", "Your server's values read (13,112 albums) but not kept: keeping them failed: disk full; tried again ten minutes on"]);
   const running = boardRows(merged({ releases: { walk: { running: true, last: null }, counts } }));

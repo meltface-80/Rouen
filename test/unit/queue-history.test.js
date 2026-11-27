@@ -22,29 +22,16 @@ const { HISTORY_MAX, MULTI_MAX, playCounted, historyEntry, pushHistory, recentHi
 const prev = (o) => Object.assign(
   { track: "T", artist: "A", album: "Al", image_key: "k", duration: 240, elapsed: 0 }, o);
 
-test("played or skipped, on the scrobbler's own rule", async (t) => {
-  await t.test("under 30 seconds is a skip however long the track is", () => {
+test("played or skipped, on the play counts' own rule (95%, 2.0.6-t20)", async (t) => {
+  await t.test("95% of the track heard is played; less is a skip, however much", () => {
     assert.equal(playCounted(prev({ elapsed: 0 })), false);
-    assert.equal(playCounted(prev({ elapsed: 29, duration: 30 })), false);
-    // The boundary itself counts — 30s is the floor, not the first value above it.
-    assert.equal(playCounted(prev({ elapsed: 30, duration: 60 })), true);
-  });
-
-  await t.test("half the track counts", () => {
-    assert.equal(playCounted(prev({ elapsed: 119, duration: 240 })), false);
-    assert.equal(playCounted(prev({ elapsed: 120, duration: 240 })), true);
-  });
-
-  await t.test("four minutes counts however long the track is", () => {
-    // A 20-minute side would otherwise need ten minutes before it registered.
-    assert.equal(playCounted(prev({ elapsed: 240, duration: 1200 })), true);
-    assert.equal(playCounted(prev({ elapsed: 239, duration: 1200 })), false);
+    assert.equal(playCounted(prev({ elapsed: 228, duration: 240 })), true);
+    assert.equal(playCounted(prev({ elapsed: 200, duration: 240 })), false, "the old rule's half the track is a skip now");
+    assert.equal(playCounted(prev({ elapsed: 600, duration: 1200 })), false, "and four minutes of a long side");
   });
 
   await t.test("a track with no duration still counts on time alone", () => {
-    // Roon does not always give a length (a stream). `elapsed >= duration*0.5`
-    // is then trivially true, which is the right answer: 30 seconds of
-    // something with no known end is not a skip.
+    // Roon does not always give a length (a stream): 30 seconds of something with no known end is not a skip.
     assert.equal(playCounted(prev({ elapsed: 30, duration: 0 })), true);
     assert.equal(playCounted(prev({ elapsed: 5, duration: 0 })), false);
   });

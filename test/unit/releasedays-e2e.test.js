@@ -72,7 +72,7 @@ function world() {
      "runReleaseDayFill", "releaseDayFillCandidates", "recordDateFill", "dateFillRetryMs",
      "releaseDayBatches", "mbBatchUrl", "mbAlbumClause", "mbQuote", "albumTitleVariants",
      "canonText",
-     "libraryView", "artistSortName", "libraryPrefix", "libraryPrefixMax", "albumMatchesPrefix", "albumPlayKey",
+     "libraryView", "artistSortName", "libraryPrefix", "libraryPrefixMax", "albumMatchesPrefix",
      "albumYearOf", "albumDateOf", "albumAddedOf", "seededRank", "libFacetDefs", "facetMatch", "albumReleaseOf",
      "albumGenresOf", "albumFileFactsOf", "albumFileFacts",
      "libAddedWindows", "normalize"],
@@ -117,7 +117,8 @@ function world() {
       libraryMetaVersion: 0, libraryDateVersion: 0, playsVersion: 0, libraryViewCache, LIBRARY_VIEW_CACHE_MAX: 8,
       LIB_SORTS: new Set(["album", "artist", "year", "added", "plays", "lastplayed", "random"]),
       albumSource: () => null, resolveAlbumLabelName: () => null,
-      getPlayedTitlesSince: () => new Set(), playedTitleSet: () => new Set(),
+      listenKey: (al) => String(al.title || "").toLowerCase().trim(),   // keyed by title here (2.0.6-t20)
+      playedAlbumKeysSince: () => new Set(), playedAlbumKeySet: () => new Set(),
       playStats: () => ({ count: new Map(), last: new Map() }),
     });
   const newestFirst = () => F.libraryView({ sort: "year", dir: "desc" }).map(a => a.subtitle);

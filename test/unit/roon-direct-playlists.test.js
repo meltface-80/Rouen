@@ -37,7 +37,8 @@ async function rig(t, faults, o = {}) {
     read: async (s, ro) => { const r = await readAlbumsOn(s, Object.assign({ timeoutMs: 1000 }, ro)); reads.push(r.ok); return r; },
   });
   t.after(async () => { s1.turnOff(); await core.close(); });
-  if (o.off) return { core, s1, link };
+  // Off: native mode is always on since 2.0.6-t21 (roon-native.md §11); off is the one-time choice's No.
+  if (o.off) { s1.turnOff(); return { core, s1, link }; }
   s1.turnOn();
   assert.ok(await until(() => reads.length >= 1 && s1.albums()), "the library was never read");
   return { core, s1, link };
@@ -88,11 +89,11 @@ test("nothing sent to a playlist that can't be changed or isn't there, nor when 
   assert.deepEqual(none.core.rec.playlistCalls, []);
 });
 
-test("refused: said as the server said it; several profiles and none chosen: not made; native mode off: nothing to explain", async (t) => {
+test("refused: said as the server said it; several profiles and Rouen's first paired with none: not made; native mode off: nothing to explain", async (t) => {
   const refused = await rig(t, { refusePlaylists: true });
   assert.match((await refused.s1.playlists.create("x")).error, /refused the new playlist \("Refused"\)/);
   const two = await rig(t, { twoProfiles: true });
-  assert.match((await two.s1.playlists.create("x")).notSent, /Choose your profile/);
+  assert.match((await two.s1.playlists.create("x")).notSent, /^Pair Rouen's first profile/);
   assert.deepEqual(two.core.rec.playlistCalls, []);
   const off = await rig(t, {}, { off: true });
   assert.deepEqual(await off.s1.playlists.list(), { notSent: "" });

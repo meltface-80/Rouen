@@ -27,25 +27,26 @@ const { loadIndexFunctions } = require("../lib/extract");
 
 // The pure helpers are EXTRACTED so the loop runs against the shipping policy;
 // only I/O and state are injected.
+// The candidates' helpers moved to lib/smart-picks/rank.js, and the seeds to seeds.js (2.0.6-t22): required, not extracted.
+const RANK = require("../../lib/smart-picks/rank");
+const { whyOf } = require("../../lib/smart-picks/seeds");
+// Tune (2.0.7-t1): the build reads it once, for the seeds, the ranking and Why these picks.
+const { defaultTune, halfLifeOf, describeTune } = require("../../lib/smart-picks/tune");
 const SHARED = [
-  "smartPickExcluded", "collectSmartCandidates", "rankSmartCandidates",
-  "diversifySmartCandidates", "smartPickSeeds",
-  "smartPickReason", "smartRateLimited", "smartAdjacentCount",
+  "smartRateLimited", "smartAdjacentCount",
   "smartSeedCount", "smartPoolCount", "smartPickKinds",
-  "smartMaxResolves", "smartAlbumTtlMs", "smartAttemptKey",
+  "smartMaxResolves", "smartAlbumTtlMs", "smartAttemptKey", "smartAttemptedToday",
   "normalize", "canonText", "canonArtist",
 ];
-// The build tests inject resolveSmartAlbum (to count its calls); the resolver
-// tests extract it. It cannot be both in one load, so the two lists differ by
-// exactly that one name.
-const BUILD_FNS   = ["buildSmartPicks"].concat(SHARED);
-const RESOLVE_FNS = ["resolveSmartAlbum"].concat(SHARED);
+// The build tests inject resolveSmartAlbum (to count its calls); the resolver moved to lib/smart-picks/resolve.js
+// (2.0.8-t9), and its tests to smart-picks-resolve.test.js.
+const BUILD_FNS   = ["buildSmartPicks", "buildSmartPicksFor"].concat(SHARED);   // each active profile's (2.0.7-t3)
 
 // A build harness. `opts` overrides any injected dependency; the counters it
 // returns are what the assertions read.
 function harness(opts) {
   opts = opts || {};
-  const calls = { resolves: [], cacheSets: [], persisted: null, autoAdded: [], later: [], logs: [], errors: [] };
+  const calls = { resolves: [], cacheSets: [], persisted: null, autoAdded: [], later: [], logs: [], errors: [], asRoonOf: [] };
   const cache = new Map(Object.entries(opts.cache || {}));
 
   const candidates = opts.candidates !== undefined ? opts.candidates
@@ -59,27 +60,37 @@ function harness(opts) {
       log:   (m) => calls.logs.push(String(m)),
       error: (m) => calls.errors.push(String(m))
     },
-    albumIndex: { albums: new Array(1000), builtAt: 1, count: 1000 },
+    albumIndex: opts.profile && !opts.profile.size ? { albums: [], builtAt: 1, count: 0 } : { albums: new Array(1000), builtAt: 1, count: 1000 },
 
     smartCachePrune: () => {},
     smartCacheGet: (k, ttl) => (cache.has(k) ? cache.get(k) : null),
     smartCacheSet: (k, v) => { cache.set(k, v); calls.cacheSets.push(k); },
 
     smartPicksServiceReady: () => opts.serviceReady !== false,
+    // What Roon's search answered in the build (smart-picks.md §11), for its log line; and whether anything answered.
+    pickAlbums: { tally: () => opts.roonTally || { asked: 0, found: 0, heard: opts.heard === undefined ? 1 : opts.heard },
+      sayNotReady: (day) => { const say = !(calls.said || []).includes(day); (calls.said = calls.said || []).push(day); return say; } },
     qobuzReady: () => opts.qobuzReady !== false,
     tidalReady: () => opts.tidalReady === true,
 
-    libraryArtistProfile: () => opts.profile || new Map([
-      ["seeda", { canon: "seeda", name: "Seed A", albums: 1, plays: 9 }],
-      ["seedb", { canon: "seedb", name: "Seed B", albums: 1, plays: 8 }],
-      ["seedc", { canon: "seedc", name: "Seed C", albums: 2, plays: 8 }],
-    ]),
+    // The seeds (lib/smart-picks/seeds.js, tested in smart-picks-seeds.test.js): these three, or none.
+    ...RANK, whyOf, halfLifeOf, describeTune,
+    smartTune: () => opts.tune || defaultTune(),
+    // One active profile unless a test says more; none has today's picks yet (2.0.7-t3).
+    // asRoonOf (2.0.7-t5): a profile's pick put aside as its devices act in Roon; noted, so the test sees whose.
+    profiles: { picksProfiles: () => opts.profiles || ["1"], asRoonOf: (p, fn) => { calls.asRoonOf.push(p); return fn(); } },
+    ...require("../../lib/smart-picks/daily"),   // buildEach: each profile in turn (moved out of index.js)
+    readSmartPicks: (day, p) => (opts.builtFor || []).includes(p) ? [{}] : [],
+    smartSeedsFor: (hubs, tune, profile) => (calls.seedTune = tune, (calls.seedsFor = calls.seedsFor || []).push(profile), { seeds: [...(opts.profile || new Map([
+      ["seeda", { canon: "seeda", name: "Seed A" }], ["seedb", { canon: "seedb", name: "Seed B" }], ["seedc", { canon: "seedc", name: "Seed C" }],
+    ])).values()].map((r) => Object.assign({ score: 1, albumPlays: 1, recentPlays: 1, tracks: 0, hub: false, albums: [], genre: "Jazz", decade: "1970s", via: "listening" }, r)),
+    left: [], slots: new Map([["Jazz", 3]]) }),
     smartHubSet: async () => new Set(opts.hubs !== undefined ? opts.hubs : ["famousact"]),
     linkableArtistSet: () => new Set(["seeda", "seedb", "seedc"]),
-    smartBlockedSet: () => new Set(opts.blocked || []),
-    smartSeenSet: () => new Set(opts.seen || []),
+    smartBlockedSet: (p) => ((calls.setsFor = calls.setsFor || []).push("blocked:" + p), new Set(opts.blocked || [])),
+    smartSeenSet: (p) => ((calls.setsFor = calls.setsFor || []).push("seen:" + p), new Set(opts.seen || [])),
 
-    fetchArtistMbid: async (name) => "mbid-" + name.toLowerCase().replace(/ /g, ""),
+    fetchArtistMbid: async (name) => (opts.noMbid ? null : "mbid-" + name.toLowerCase().replace(/ /g, "")),
     smartSimilarRows: async () => candidates,
 
     resolveSmartAlbum: async (name) => {
@@ -94,10 +105,10 @@ function harness(opts) {
     // v1.8.67: a destination rather than a switch. `autoAdd: false` is the
     // old "off", which is "ask" now.
     smartPicksDest: opts.dest || (opts.autoAdd === false ? "ask" : "library"),
-    autoAddSmartAlbum: async (album) => { calls.autoAdded.push(album.id); return true; },
+    autoAddSmartAlbum: async (album, artist, profile) => { calls.autoAdded.push(album.id); (calls.addedAs = calls.addedAs || []).push(artist + "@" + profile); return true; },
     // The list in force (lib/routes/listen-later.js put, v1.9.45): Roon's with native mode on, else Rouen's.
     listenLater: { put: async (entry) => { calls.later.push(entry); } },
-    persistSmartPicks: (day, picks) => { calls.persisted = picks; },
+    persistSmartPicks: (day, picks, profile) => { calls.persisted = picks; (calls.persistedFor = calls.persistedFor || []).push(profile); },
   };
   return { F: loadIndexFunctions(BUILD_FNS, Object.assign(inj, opts.inject || {})), calls, cache };
 }
@@ -124,6 +135,36 @@ test("the build is bounded in how many lookups it makes", { concurrency: 1 }, as
     assert.equal(adjacentTries, h.F.smartAdjacentCount());
     assert.equal(h.calls.persisted.filter(p => p.kind === "adjacent").length, 5);
     assert.equal(h.calls.persisted.length, 5, "a kind other than adjacent was built");
+  });
+
+  await t.test("Why these picks is kept with the picks it explains, never for a build that kept none (2.0.6-t22)", async () => {
+    const h = harness({});
+    await h.F.buildSmartPicks("2026-08-05");
+    const why = h.cache.get("why:1");
+    assert.ok(why, "no why kept for the day's picks");
+    assert.deepEqual([why.day, why.seeds.map((s) => s.name)], ["2026-08-05", ["Seed A", "Seed B", "Seed C"]]);
+    const none = harness({ noMbid: true, cache: { "why:1": { day: "yesterday" } } });
+    await none.F.buildSmartPicks("2026-08-05");
+    assert.deepEqual(none.cache.get("why:1"), { day: "yesterday" }, "THE one (the review): today's seeds beside yesterday's picks");
+  });
+
+  await t.test("the Tune reaches the seeds, the ranking and Why these picks (2.0.7-t1)", async () => {
+    // Far (before Tune): the candidate reached from one seed first. Close: the one reached from three.
+    const candidates = [{ mbid: "one", name: "Lone", score: 900, seed: "s0" },
+      ...["s0", "s1", "s2"].map((seed) => ({ mbid: "three", name: "Crowd", score: 500, seed }))];
+    const far = harness({ candidates, tune: Object.assign(defaultTune(), { adventure: 4 }) });
+    await far.F.buildSmartPicks("2026-08-05");
+    assert.equal(far.calls.resolves[0], "Lone");
+    const tune = Object.assign(defaultTune(), { adventure: 0, window: 4, genres: { Jazz: "more" } });
+    const close = harness({ candidates, tune });
+    await close.F.buildSmartPicks("2026-08-05");
+    assert.equal(close.calls.resolves[0], "Crowd", "THE one: Adventure never reached the ranking");
+    assert.equal(close.calls.seedTune, tune, "the seeds weren't chosen with the Tune");
+    const why = close.cache.get("why:1");
+    assert.deepEqual(why.tuned, ["Listening window: All time", "Adventure: Close", "Jazz: More"]);
+    assert.equal(why.numbers.halfLifeDays, null);
+    assert.deepEqual(why.picks.map((p) => p.artist), ["Crowd", "Lone"]);
+    assert.ok(why.picks.every((p) => Array.isArray(p.seeds)), "a pick's starting artists weren't kept for its More / Never");
   });
 });
 
@@ -169,7 +210,9 @@ test("picks are added automatically when the setting says so", { concurrency: 1 
       assert.equal(e.service, "qobuz", "the entry lost the service it can be added from");
       assert.ok(e.album_id, "the entry lost the album id it can be added from");
       assert.ok(e.title, "the entry has no album title");
+      assert.equal(e.profile, "1", "2.0.7-t5: the pick not put aside as its profile's (profiles.md §12)");
     }
+    assert.deepEqual(h.calls.asRoonOf, ["1", "1", "1", "1", "1"], "not put aside as its profile's devices act in Roon (a linked one's own list)");
   });
 
   await t.test("the library destination does not also fill Listen later", async () => {
@@ -178,16 +221,26 @@ test("picks are added automatically when the setting says so", { concurrency: 1 
     assert.equal(h.calls.autoAdded.length, 5);
     assert.deepEqual(h.calls.later, []);
   });
+
+  await t.test("a build a Tune change asked for favourites nothing, even to the library; Listen later is unchanged (2.0.7-t1)", async () => {
+    const h = harness({ dest: "library" });
+    await h.F.buildSmartPicks("2026-08-05", { tuned: true });
+    assert.deepEqual(h.calls.autoAdded, [], "THE one (the owner: \"Show, don't add\"): each Tune tap favourited five albums");
+    assert.equal(h.calls.persisted.length, 5, "its picks still shown, with Add");
+    const later = harness({ dest: "later" });
+    await later.F.buildSmartPicks("2026-08-05", { tuned: true });
+    assert.equal(later.calls.later.length, 5);
+  });
 });
 
 // ---------------------------------------------------------------------------
 test("an empty hub chart aborts rather than degrading silently",
   { concurrency: 1 }, async (t) => {
     await t.test("no picks are built and nothing is persisted", async () => {
-      // With no hubs, smartPickSeeds stops filtering and seeds from the most
-      // played artists — which on a real library means Radiohead and Pink Floyd,
-      // the exact inversion this feature exists to avoid. A day with no picks is
-      // recoverable; a day of picks that discredit the feature is not.
+      // With no hubs, the famous seed at full weight and famous candidates are
+      // no longer rejected (lib/smart-picks/seeds.js, smart-picks.md §3.2). A day
+      // with no picks is recoverable; a day of picks that discredit the feature
+      // is not.
       const h = harness({ hubs: [] });
       await h.F.buildSmartPicks("2026-08-05");
       assert.equal(h.calls.persisted, null, "picks were built from an unfiltered seed list");
@@ -204,12 +257,15 @@ test("an empty hub chart aborts rather than degrading silently",
 
 // ---------------------------------------------------------------------------
 test("a build that cannot possibly work does not run", { concurrency: 1 }, async (t) => {
-  await t.test("no streaming service connected — skipped and marked", async () => {
+  await t.test("nothing to find albums with — skipped, NOT marked, said once (smart-picks.md §11, 2.0.8-t9)", async () => {
+    // THE one for the owner (2026-11-26): a day marked tried with no service stayed empty after Qobuz was signed in.
+    // kickSmartPicks starts no job while nothing is ready, so the unmarked day costs nothing until one is.
     const h = harness({ serviceReady: false });
     await h.F.buildSmartPicks("2026-08-05");
     assert.equal(h.calls.resolves.length, 0);
-    assert.ok(h.cache.has(h.F.smartAttemptKey("2026-08-05")),
-      "the day was not marked attempted, so every request would retry the build");
+    assert.equal(h.cache.has(h.F.smartAttemptKey("2026-08-05", "1")), false,
+      "the day was marked tried, so a service or native mode up later the same day builds nothing till tomorrow");
+    assert.equal(h.calls.logs.filter((m) => /neither native mode nor a streaming service/.test(m)).length, 1);
   });
 
   await t.test("an empty library is NOT marked attempted", async () => {
@@ -217,7 +273,7 @@ test("a build that cannot possibly work does not run", { concurrency: 1 }, async
     // should be retried once it has. Marking it would lose the whole first day.
     const h = harness({ profile: new Map() });
     await h.F.buildSmartPicks("2026-08-05");
-    assert.equal(h.cache.has(h.F.smartAttemptKey("2026-08-05")), false);
+    assert.equal(h.cache.has(h.F.smartAttemptKey("2026-08-05", "1")), false);
   });
 
   await t.test("a completed build marks the day even when it found nothing", async () => {
@@ -225,7 +281,7 @@ test("a build that cannot possibly work does not run", { concurrency: 1 }, async
     // zero-pick day re-runs the entire pipeline on every request.
     const h = harness({ resolveAll: false });
     await h.F.buildSmartPicks("2026-08-05");
-    assert.ok(h.cache.has(h.F.smartAttemptKey("2026-08-05")));
+    assert.ok(h.cache.has(h.F.smartAttemptKey("2026-08-05", "1")));
   });
 });
 
@@ -253,106 +309,76 @@ test("rate limiting stops the build instead of pushing harder",
     });
   });
 
-// ---------------------------------------------------------------------------
-test("resolveSmartAlbum caches only what it actually learned",
-  { concurrency: 1 }, async (t) => {
-    function resolver(opts) {
-      opts = opts || {};
-      const cache = new Map();
-      const sets = [];
-      const F = loadIndexFunctions(RESOLVE_FNS, {
-        DEBUG: false,
-        console: { log: () => {}, error: () => {} },
-        albumIndex: { albums: [], builtAt: 1, count: 0 },
-        smartCacheGet: (k) => (cache.has(k) ? cache.get(k) : null),
-        smartCacheSet: (k, v) => { cache.set(k, v); sets.push(k); },
-        qobuzReady: () => opts.qobuz !== false,
-        tidalReady: () => opts.tidal === true,
-        qobuzToken: "t", qobuzUsername: "", qobuzPasswordMd5: "",
-        tidalRefreshToken: "", tidalUserId: "",
-        qobuzWithToken: async (fn) => {
-          if (opts.qobuzThrows) throw opts.qobuzThrows;
-          return { albums: { items: opts.qobuzItems || [] } };
-        },
-        qobuz: {},
-        normalizeQobuzAlbums: (items) => items,
-        tidalWithToken: async (fn) => {
-          if (opts.tidalThrows) throw opts.tidalThrows;
-          return fn("tok", "GB", "uid");
-        },
-        tidal: {
-          searchArtists: async () => opts.tidalArtists || { items: [], total: 0 },
-          getArtistAlbums: async () => opts.tidalAlbums || { items: [], total: 0 },
-        },
-        normalizeTidalAlbums: (items) => items,
-      });
-      return { F, cache, sets };
-    }
+test("each active profile gets its own build; one built today is left alone; a rebuild builds its profile only (2.0.7-t3)", async () => {
+  const h = harness({ profiles: ["1", "2", "3"], builtFor: ["2"] });
+  await h.F.buildSmartPicks("2026-08-05");
+  assert.deepEqual(h.calls.persistedFor, ["1", "3"], "THE one: one set for everyone, or a profile's set of today replaced");
+  assert.deepEqual(h.calls.seedsFor, ["1", "3"], "the seeds weren't each profile's own");
+  assert.deepEqual(h.calls.setsFor, ["blocked:1", "seen:1", "blocked:3", "seen:3"], "one profile's Not for me or seen used for another");
+  assert.ok(h.cache.has("why:1") && h.cache.has("why:3") && !h.cache.has("why:2"));
+  const one = harness({ profiles: ["1", "2"], builtFor: ["1", "2"] });
+  await one.F.buildSmartPicks("2026-08-05", { profile: "2", tuned: true });
+  assert.deepEqual(one.calls.persistedFor, ["2"], "a profile's Rebuild rebuilt another's set too");
+});
 
-    await t.test("a miss with NO service consulted is not cached", async () => {
-      // THE one. Caching here writes a week of dead negatives on a machine with
-      // nothing connected, and the user who then connects Qobuz gets an empty
-      // feature until the TTL expires.
-      const r = resolver({ qobuz: false, tidal: false });
-      assert.equal(await r.F.resolveSmartAlbum("Nobody"), null);
-      assert.deepEqual(r.sets, [],
-        "a negative was cached without any service having answered");
-    });
+test("a pick added is added as its own profile, by its artist; the log says what Roon's search found (smart-picks.md §11)", async () => {
+  const h = harness({ profiles: ["2"], roonTally: { asked: 7, found: 5, heard: 5 } });
+  await h.F.buildSmartPicks("2026-08-05");
+  assert.deepEqual(h.calls.addedAs, ["Cand 0@2", "Cand 1@2", "Cand 2@2", "Cand 3@2", "Cand 4@2"], "THE one: added as another profile, or without its artist");
+  assert.ok(h.calls.logs.some((m) => /Roon's search found an album for 5 of 7\)/.test(m)), "the build's log line doesn't say what Roon's search found");
+});
 
-    await t.test("a miss after a service ANSWERED is cached", async () => {
-      const r = resolver({ qobuzItems: [] });
-      assert.equal(await r.F.resolveSmartAlbum("Nobody"), null);
-      assert.equal(r.sets.length, 1, "a real negative must be cached or it is refetched daily");
+test("nothing to find albums with: no build job is started, unless asked for by hand (smart-picks.md §11)", async () => {
+  // The day isn't marked tried with nothing ready, so without this every Home visit and timer tick queued a job, and
+  // each job's finish bumped picksVersion, which wakes the screens to ask — and kick — again.
+  const kick = async (ready, force) => {
+    const jobs = [];
+    const F = loadIndexFunctions(["kickSmartPicks"], {
+      smartPicksEnabled: true, smartDayKey: () => "2026-08-05", _smartBuilding: null, picksVersion: 0,
+      smartPicksServiceReady: () => ready, profiles: { picksProfiles: () => ["1"] }, readSmartPicks: () => [],
+      smartAttemptedToday: () => false, smartPicksDue: () => true, buildSmartPicks: () => {},
+      bgRun: (why) => { jobs.push(why); return Promise.resolve(); },
+      asHousehold: (fn) => { jobs.push("now"); return Promise.resolve().then(fn); },
     });
+    F.kickSmartPicks(force ? "rebuild" : "requested", force);
+    await new Promise((r) => { setImmediate(r); });
+    return jobs;
+  };
+  assert.deepEqual(await kick(false, false), [], "THE one: a job started with nothing to find albums with");
+  assert.deepEqual(await kick(true, false), ["smart picks (requested)"]);
+  assert.deepEqual(await kick(false, true), ["now"], "a rebuild by hand refused for want of something ready");
+});
 
-    await t.test("a miss after a service THREW is not cached", async () => {
-      // A one-minute token blip must not become a week-long hole.
-      const r = resolver({ qobuzThrows: new Error("connection reset") });
-      assert.equal(await r.F.resolveSmartAlbum("Nobody"), null);
-      assert.deepEqual(r.sets, []);
-    });
-
-    await t.test("a 429 propagates instead of being cached as a miss", async () => {
-      const e = new Error("rate limited"); e.code = 429;
-      const r = resolver({ qobuzThrows: e });
-      await assert.rejects(() => r.F.resolveSmartAlbum("Nobody"), /rate limited/);
-      assert.deepEqual(r.sets, []);
-    });
-
-    await t.test("a hit is cached and served from cache next time", async () => {
-      const r = resolver({ qobuzItems: [{ id: 1, title: "A", artist: "Real Act", image: "" }] });
-      const first = await r.F.resolveSmartAlbum("Real Act");
-      assert.equal(first.service, "qobuz");
-      const before = r.sets.length;
-      const second = await r.F.resolveSmartAlbum("Real Act");
-      assert.equal(second.title, "A");
-      assert.equal(r.sets.length, before, "the cached answer was refetched");
-    });
-
-    await t.test("an artist Qobuz does not credit is rejected", async () => {
-      // Qobuz search matches on title too, so an unfiltered top hit is often a
-      // different act. Picking it would credit the wrong artist on the card.
-      const r = resolver({ qobuzItems: [{ id: 1, title: "Tribute", artist: "Someone Else", image: "" }] });
-      assert.equal(await r.F.resolveSmartAlbum("Real Act"), null);
-    });
-
-    await t.test("TIDAL's paged shape is read correctly", async () => {
-      // searchArtists returns { items, total }, not an array. Treating it as an
-      // array threw on every lookup, which made Smart Picks permanently empty
-      // for anyone without Qobuz.
-      const r = resolver({
-        qobuz: false, tidal: true,
-        tidalArtists: { items: [{ id: 7, name: "Real Act" }], total: 1 },
-        tidalAlbums:  { items: [{ id: 9, title: "TA", artist: "Real Act", image: "" }], total: 1 },
-      });
-      const got = await r.F.resolveSmartAlbum("Real Act");
-      assert.ok(got, "the TIDAL path returned nothing — it is misreading the paged wrapper");
-      assert.equal(got.service, "tidal");
-    });
-
-    await t.test("an unrecognisable artist name never reaches the network", async () => {
-      const r = resolver({ qobuzItems: [{ id: 1, title: "X", artist: "!!!", image: "" }] });
-      assert.equal(await r.F.resolveSmartAlbum("!!!"), null);
-      assert.deepEqual(r.sets, []);
-    });
+test("2.0.8-t10: a Rebuild by hand runs now, not behind the queue (the owner, 2026-11-26: twenty minutes behind the genre walk)", async () => {
+  const jobs = [];
+  let built = 0, failed = [];
+  const F = loadIndexFunctions(["kickSmartPicks"], {
+    smartPicksEnabled: true, smartDayKey: () => "2026-08-05", _smartBuilding: null, picksVersion: 0,
+    smartPicksServiceReady: () => true, profiles: { picksProfiles: () => ["1"] }, readSmartPicks: () => [],
+    smartAttemptedToday: () => false, smartPicksDue: () => true,
+    buildSmartPicks: async () => { built++; if (built === 2) throw new Error("boom"); },
+    bgRun: (why) => { jobs.push(why); return new Promise(() => {}); },   // the queue: a genre walk that never ends
+    asHousehold: (fn) => fn(),
+    console: { log: () => {}, error: (m) => failed.push(String(m)) },
   });
+  F.kickSmartPicks("rebuild", true);
+  await new Promise((r) => { setImmediate(r); });
+  assert.equal(built, 1, "THE one: the rebuild waited behind the queue");
+  assert.deepEqual(jobs, [], "the rebuild was queued");
+  // A rebuild that fails is said, as a queued job's failure is, and doesn't leave the build marked running.
+  F.kickSmartPicks("rebuild", true);
+  await new Promise((r) => { setImmediate(r); });
+  assert.equal(built, 2, "a second rebuild after the first ended never ran: the first was left marked running");
+  assert.ok(failed.some((m) => /smart picks \(rebuild\) failed: boom/.test(m)), "a failed rebuild not said");
+});
+
+test("nothing answered for any candidate (native mode's searches refused, a sign-in failing): nothing kept, the day not marked (the review)", async () => {
+  const h = harness({ resolveAll: false, heard: 0 });
+  await h.F.buildSmartPicks("2026-08-05");
+  assert.equal(h.cache.has(h.F.smartAttemptKey("2026-08-05", "1")), false, "THE one: a day of refused searches kept as the day's answer");
+  assert.equal(h.calls.persisted, null, "today's picks wiped by a build that heard nothing");
+  assert.ok(h.calls.logs.some((m) => /nothing answered for any of the 40 candidates/.test(m)));
+  const heard = harness({ resolveAll: false, heard: 3 });
+  await heard.F.buildSmartPicks("2026-08-05");
+  assert.ok(heard.cache.has(heard.F.smartAttemptKey("2026-08-05", "1")), "a day whose searches answered with nothing isn't marked");
+});

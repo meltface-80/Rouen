@@ -1,0 +1,4 @@
+# Made by CI (.github/workflows/lite.yml), never committed (dev/design/rouen-lite.md §3).
+/build
+/src/main/jniLibs/
+/src/main/assets/rouen.zip

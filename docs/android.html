@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rouen for Android — your phone as a Roon zone · Rouen</title>
+<meta name="description" content="New in v2.0. The Rouen app turns your Android phone into a Roon zone, at home and away from home. All the music still comes from Roon: your library, and TIDAL and Qobuz through Roon's own sign-ins. There is no second music server to run and no extra streaming-service login. Rouen carries Roon's sound to your phone, through Tailscale built into Rouen when you are out.">
+<link rel="icon" href="rouen-logo.png">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+
+<header class="pagehead">
+  <div class="wrap">
+    <select id="lang-select" class="lang-select" aria-label="Language">
+      <option value="en">🇬🇧 English</option>
+      <option value="fr">🇫🇷 Français</option>
+      <option value="de">🇩🇪 Deutsch</option>
+      <option value="es">🇪🇸 Español</option>
+      <option value="it">🇮🇹 Italiano</option>
+      <option value="nl">🇳🇱 Nederlands</option>
+      <option value="sv">🇸🇪 Svenska</option>
+      <option value="da">🇩🇰 Dansk</option>
+      <option value="no">🇳🇴 Norsk</option>
+    </select>
+    <a class="back" href="index.html" data-i18n="site.contents">← Contents</a>
+    <a class="brand" href="index.html"><img src="rouen-logo.png" alt=""><span>Rouen</span></a>
+    <span class="spacer"></span>
+    <a class="pill solid" href="install.html" data-i18n="nav.install">Install</a>
+  </div>
+</header>
+
+<main class="wrap page">
+  <h1 data-i18n="k168">Rouen for Android — your phone as a Roon zone</h1>
+    <p data-i18n="k169" class="lead">New in v2.0. The Rouen app turns your Android phone into a Roon zone, at home and away
+       from home. All the music still comes from <b>Roon</b>: your library, and TIDAL and Qobuz through Roon's own
+       sign-ins. There is no second music server to run and no extra streaming-service login. Rouen carries Roon's
+       sound to your phone, through Tailscale built into Rouen when you are out.</p>
+    <div class="downloads" data-i18n="k281"><a class="dl-link" href="https://github.com/meltface-80/Rouen/releases/latest/download/rouen-android.apk">⬇ Rouen for Android</a><span class="note"><b>Rouen for Android</b> makes your phone a Roon zone, with Rouen on your server or PC.</span></div>
+
+    <h3 data-i18n="k170" class="sub">What it does</h3>
+    <div class="firstrun">
+      <ol>
+        <li data-i18n="k171"><b>Your phone appears in Roon as a zone</b> named <b>Rouen</b> followed by the phone's name, for example
+            <i>Rouen Pixel 8</i>. Play to it from Rouen or from Roon's own apps. Roon's
+            queue, Radio, play counts, DSP and volume levelling all work as on any zone.</li>
+        <li data-i18n="k172"><b>Rouen's whole page is in the app</b>: Home, Library, the Shelf, Settings, everything. The notification
+            and lock screen show what Roon is playing, and their buttons control Roon.</li>
+        <li data-i18n="k173"><b>At home and away, the same way.</b> On your home Wi-Fi the app reaches Rouen directly. On mobile data
+            or another Wi-Fi it reaches Rouen through Tailscale, built into both Rouen and the app. Away from home,
+            only your phone's own zone is shown and it is selected for you; your other zones come back when you are
+            home.</li>
+        <li data-i18n="k174"><b>Two qualities, chosen separately for home and away</b>: <b>Opus 256 kbps</b> (the default; small,
+            and sounds excellent) or <b>Lossless</b> (FLAC at the original resolution).</li>
+        <li data-i18n="k175"><b>Downloads</b>: save albums from your own music files to the phone, and play them anywhere, even with
+            no connection at all.</li>
+        <li data-i18n="k176"><b>Android Auto</b>: Recently played, Smart Picks, Random albums, Library A–Z, Playlists and Downloaded
+            albums on your car's screen.</li>
+      </ol>
+    </div>
+
+    <h3 data-i18n="k177" class="sub">How the music gets to your phone</h3>
+    <div class="firstrun">
+      <p data-i18n="k178">The sound takes this path, and every step stays inside things you already run:</p>
+      <ol>
+        <li data-i18n="k179"><b>Roon Server</b> plays to your phone's zone, exactly as it plays to any Squeezebox. The audio leaves
+            Roon lossless.</li>
+        <li data-i18n="k180"><b>Rouen</b>, on your own machine next to Roon, receives it on the phone's player. It turns it into one
+            continuous stream for the phone: Opus 256, or lossless FLAC.</li>
+        <li data-i18n="k181">That stream goes to <b>the app</b>: over your home Wi-Fi, or over the internet through
+            <b>Tailscale</b> when you are away. Tailscale is a private, encrypted link between Rouen and your
+            phone; nothing is opened to the internet.</li>
+        <li data-i18n="k182"><b>The app</b> keeps a buffer of music ahead and plays it to the phone's speaker, your headphones or
+            your car.</li>
+      </ol>
+      <p data-i18n="k183">This keeps everything coming through Roon, with nothing to host beyond Rouen itself and no streaming
+         service to sign in to again.</p>
+    </div>
+
+    <h3 data-i18n="k184" class="sub">Set it up</h3>
+    <div class="firstrun">
+      <p data-i18n="k185">You need: Rouen v2.0.8 or newer, running and paired with Roon; an Android phone (Android 8 or later,
+         64-bit); and, for use away from home, a free <a href="https://tailscale.com">Tailscale</a> account.</p>
+      <ol>
+        <li data-i18n="k186">In <b>Roon</b>, go to <b>Settings → Setup</b> and turn <b>Squeezebox support</b> on.
+            <br><b>If you also run Lyrion Music Server</b> (formerly Logitech Media Server) on the same network,
+            stop it while you use Rouen for Android. Lyrion takes priority over Roon for Squeezebox and Squeezelite
+            players, and with it running, Rouen away from home won't work.</li>
+        <li data-i18n="k187">On the phone, open the
+            <a href="https://github.com/meltface-80/Rouen/releases/latest">release page</a> and download
+            <a href="https://github.com/meltface-80/Rouen/releases/latest/download/rouen-android.apk"><b>rouen-android.apk</b></a> from the newest release (under <i>Assets</i>). Open it and install it. If
+            Android asks, allow your browser to install apps.</li>
+        <li data-i18n="k188">Open <b>Rouen</b> on the phone, at home on your Wi-Fi. It finds Rouen by itself; if it doesn't, type
+            Rouen's address with <code>:3399</code>, for example <code>192.168.1.20:3399</code>. Give the phone a
+            name, and sign in to Rouen as you do in the browser.</li>
+        <li data-i18n="k189">In Roon, the zone <b>Rouen</b> + your phone's name appears. In its <b>Device Setup</b>, set
+            <b>Volume Control</b> to <b>Fixed volume</b>, and use the phone's own volume buttons.
+            <br><b>Don't rename this zone in Roon.</b> Leave it as Roon names it, <b>Rouen</b> + your phone's name.
+            The app finds its own zone by that name: renamed, it is lost, and away from home you see no zones at
+            all. For a different name, give it on the app's first screen, where it asks for the phone's name.</li>
+        <li data-i18n="k190"><b>For away from home:</b> in Rouen, go to <b>Settings → Setup → Away from home</b>. Tap <b>Sign in</b>
+            for Rouen's server, then <b>Sign in</b> under <b>This phone</b>. Use the same Tailscale account for
+            both. Until you sign in, Rouen's built-in Tailscale stays off and contacts no Tailscale server, and it never
+            sends Tailscale's diagnostic logs.</li>
+        <li data-i18n="k191"><b>Choose the quality:</b> go to <b>Settings → Audio Devices</b>, tap your phone, and scroll to
+            <b>Streaming quality</b> at the bottom. Set <b>On home Wi-Fi</b> and <b>Away</b> to <b>Opus 256 kbps</b>
+            or <b>Lossless (FLAC)</b>. A change is used from the next time Roon starts playing to the phone.</li>
+      </ol>
+    </div>
+
+    <h3 data-i18n="k192" class="sub">Use it</h3>
+    <div class="firstrun">
+      <ol>
+        <li data-i18n="k193"><b>To play on the phone</b>, choose your phone's zone in the zone picker and play anything, as on any
+            zone. Pause, skip and the volume work from the app, the lock screen and the notification.</li>
+        <li data-i18n="k194"><b>Leaving home:</b> nothing to do. When the phone leaves your Wi-Fi the other zones drop off, your
+            phone's zone is selected, and the music carries on through Tailscale.</li>
+        <li data-i18n="k195"><b>Downloads:</b> open an album's <b>⋯</b> menu and choose <b>Download to this phone</b>. Downloaded
+            albums have their own row on Home, and play with no connection. Quality, folder, size limit and
+            Wi-Fi only are under <b>Settings → Setup → Downloads &amp; Offline</b>.</li>
+        <li data-i18n="k196"><b>Android Auto:</b> plug the phone into the car, or connect wirelessly, and choose Rouen. Because the
+            app is installed from a file rather than the Play Store, Android Auto only lists it once you turn on
+            <b>Unknown sources</b>: in the Android Auto settings, tap <b>Version</b> ten times, then
+            <b>⋮ → Developer settings → Unknown sources</b>.</li>
+        <li data-i18n="k197"><b>Updates:</b> the app tells you when there is a newer one, and updates itself with one tap.</li>
+        <li data-i18n="k198"><b>Something not right?</b> Turn on <b>Settings → Setup → Logging</b>, use the app until it happens, then
+            tap <b>Save log</b> and send the file with your report. It holds no personal data.</li>
+      </ol>
+    </div>
+
+    <h3 data-i18n="k199" class="sub">What it doesn't do</h3>
+    <div class="firstrun">
+      <ol>
+        <li data-i18n="k200"><b>No iPhone or iPad app.</b> On those, Rouen's page in Safari works as before, as a remote.</li>
+        <li data-i18n="k201"><b>It needs Rouen and Roon Server running</b>, and your home internet up, to stream. With either off, the
+            app plays only your downloads.</li>
+        <li data-i18n="k202"><b>Not bit-perfect.</b> Lossless arrives unaltered, but the phone plays it through Android's own mixer
+            at the phone's volume.</li>
+        <li data-i18n="k203"><b>No downloads of TIDAL or Qobuz albums</b>, ever. Only albums from your own files can be
+            downloaded.</li>
+        <li data-i18n="k204"><b>No search in Android Auto</b> yet.</li>
+        <li data-i18n="k205"><b>Not alongside Lyrion Music Server.</b> With Lyrion running on the same network, it takes priority
+            for Squeezebox players, and Rouen away from home won't work. Stop Lyrion while you use the app.</li>
+        <li data-i18n="k206"><b>The phone's zone isn't always in Roon.</b> About 15 minutes after you last used the app with nothing
+            playing, the app rests and its zone leaves Roon. Open the app and it is back.</li>
+      </ol>
+    </div>
+
+    <h3 data-i18n="k207" class="sub">Why the music might drop out</h3>
+    <div class="firstrun">
+      <p data-i18n="k208">The music travels from your home to wherever you are, so it can only be as steady as the connection
+         along the way. The app keeps a buffer ahead to ride over short gaps; music stops only when that buffer
+         runs out. What can cause that:</p>
+      <ol>
+        <li data-i18n="k209"><b>Weak or no mobile signal</b>: tunnels, trains, lifts, the countryside. Playback carries on from the
+            buffer, then pauses until the signal comes back.</li>
+        <li data-i18n="k210"><b>Switching between Wi-Fi and mobile data.</b> The connection moves to the new network; the buffer
+            usually covers it, but a slow change can leave a short gap.</li>
+        <li data-i18n="k211"><b>Your home's upload speed.</b> Away, every note leaves your home through your internet's upload.
+            Opus 256 needs about 0.3 Mbit/s (about 115 MB of mobile data an hour); lossless needs about 1 Mbit/s for
+            CD quality (about 400 MB an hour) and 3–6 Mbit/s for high resolution. Lossless away is the likelier to
+            drop out.</li>
+        <li data-i18n="k212"><b>Tailscale relaying.</b> When your networks don't allow a direct link, Tailscale passes the stream
+            through one of its relays, which is slower.</li>
+        <li data-i18n="k213"><b>The phone's battery saver</b> can pause apps in the background. Set Rouen's battery use to
+            <b>Unrestricted</b> (Settings → Apps → Rouen → Battery).</li>
+        <li data-i18n="k214"><b>A pause, skip or seek</b> takes a moment, because the phone has to follow Roon over the
+            network.</li>
+      </ol>
+      <p data-i18n="k215">For the steadiest listening away, keep <b>Away</b> on <b>Opus 256</b>, or download what you'll want
+         where the signal is poor.</p>
+    </div>
+  <nav class="pager"><a class="back" href="index.html" data-i18n="site.back">← Back to contents</a></nav>
+</main>
+
+<footer>
+  <p data-i18n="k280">Rouen · MIT licence · © 2026 Lewis Menzies (Music Duck / MusicD) ·
+     <a href="https://github.com/meltface-80/MusicD-Remote">github.com/meltface-80/MusicD-Remote</a><br>
+     Roon is a trademark of Roon Labs LLC. This is an independent extension, not affiliated with Roon Labs.</p>
+</footer>
+<script src="site.js"></script>
+<script src="i18n.js"></script>
+</body>
+</html>
