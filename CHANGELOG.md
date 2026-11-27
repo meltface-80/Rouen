@@ -6,6 +6,18 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.8-t11] — 2026-11-27
+
+### Fixed
+
+- **A pick with an edition after a dash didn't open, and had no cover:** The Chameleons' "Script Of The Bridge - 25th
+  Anniversary Edition". Roon's search with the edition found another artist's anniversary edition instead. Titles are
+  now searched and matched without their edition, whether in brackets or after a dash ("- 25th Anniversary Edition",
+  "- Remastered"). The class of error: only one of two ways of writing an edition handled. The gate:
+  `album-edition.test.js`, `catalogue-album-open.test.js`, `smart-picks-resolve.test.js`.
+- **A pick with a long title put its text under its cover on a phone.** It stays beside it now. The gate:
+  `smart-picks-card.test.js`.
+
 ## [2.0.8-t10] — 2026-11-26
 
 ### Fixed

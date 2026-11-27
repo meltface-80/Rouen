@@ -196,6 +196,13 @@ test("2.0.8-t10, the owner's Pink Flag: Deezer's cover found without the edition
   assert.deepEqual(svc.asked.deezer, []);
 });
 
+test("2.0.8-t11, the owner's Chameleons: the cover found without an edition after a dash", async () => {
+  const deezer = { data: [{ title: "Script of the Bridge", artist: { name: "The Chameleons" }, cover_big: "https://cdn.invalid/sotb.jpg" }] };
+  const r = resolver({ qobuz: false, roon: { hits: [HIT({ title: "Script Of The Bridge - 25th Anniversary Edition", artist: "The Chameleons" })] }, deezer });
+  assert.equal((await r.p.find("The Chameleons")).image, "https://cdn.invalid/sotb.jpg", "THE one: no cover for an edition after a dash");
+  assert.ok(/album%3A%22Script%20Of%20The%20Bridge%22/.test(r.asked.deezer[0]), r.asked.deezer[0]);
+});
+
 // ---------------------------------------------------------------------------
 // Ported unchanged from smartpicks-build.test.js ("resolveSmartAlbum caches only what it actually learned", v1.7.41).
 test("resolveSmartAlbum caches only what it actually learned", { concurrency: 1 }, async (t) => {
